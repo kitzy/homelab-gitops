@@ -17,14 +17,25 @@ spec:
       - name: nginx
         image: nginx:alpine
         ports:
-        - containerPort: 80
+        - containerPort: 443
         volumeMounts:
         - name: html
           mountPath: /usr/share/nginx/html
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        - name: tls
+          mountPath: /etc/nginx/ssl
+          readOnly: true
       volumes:
       - name: html
         configMap:
           name: hello-world-html
+      - name: nginx-config
+        configMap:
+          name: nginx-ssl-config
+      - name: tls
+        secret:
+          secretName: hello-world-tls
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -69,11 +80,36 @@ data:
         <div class="container">
             <h1>🚀 Homelab K3s Cluster</h1>
             <p>Cloudflare Tunnel Test - Success!</p>
+            <p>🔒 End-to-End TLS Enabled</p>
             <div class="info">
                 <p><strong>Infrastructure:</strong></p>
                 <p>K3s HA Cluster → Flux GitOps → 1Password Secrets</p>
                 <p>External Access: Cloudflare Tunnel</p>
+                <p>Internal TLS: Self-Signed Certificates</p>
             </div>
         </div>
     </body>
     </html>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-ssl-config
+  namespace: hello-world
+data:
+  default.conf: |
+    server {
+        listen 443 ssl;
+        server_name hello.kitzy.net hello-world.hello-world.svc.cluster.local;
+        
+        ssl_certificate /etc/nginx/ssl/tls.crt;
+        ssl_certificate_key /etc/nginx/ssl/tls.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+    }

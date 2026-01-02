@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: hello-world-tls
+  namespace: hello-world
+spec:
+  secretName: hello-world-tls
+  dnsNames:
+  - hello.kitzy.net
+  - hello-world.hello-world.svc.cluster.local
+  issuerRef:
+    name: ca-issuer
+    kind: ClusterIssuer
