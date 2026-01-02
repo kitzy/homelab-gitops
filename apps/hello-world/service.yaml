@@ -3,13 +3,11 @@ kind: Service
 metadata:
   name: hello-world
   namespace: hello-world
-  annotations:
-    external-dns.alpha.kubernetes.io/hostname: hello.kitzy.net
-    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
 spec:
   type: ClusterIP
   selector:
     app: hello-world
   ports:
-  - port: 80
-    targetPort: 80
+  - port: 443
+    targetPort: 443
+    name: https
