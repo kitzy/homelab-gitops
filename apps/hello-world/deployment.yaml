@@ -78,12 +78,12 @@ data:
     </head>
     <body>
         <div class="container">
-            <h1>🚀 Homelab K3s Cluster</h1>
+            <h1>Homelab K3s Cluster</h1>
             <p>Cloudflare Tunnel Test - Success!</p>
-            <p>🔒 End-to-End TLS Enabled</p>
+            <p>End-to-End TLS Enabled</p>
             <div class="info">
                 <p><strong>Infrastructure:</strong></p>
-                <p>K3s HA Cluster → Flux GitOps → 1Password Secrets</p>
+                <p>K3s HA Cluster | Flux GitOps | 1Password Secrets</p>
                 <p>External Access: Cloudflare Tunnel</p>
                 <p>Internal TLS: Self-Signed Certificates</p>
             </div>
