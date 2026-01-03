@@ -28,6 +28,12 @@ spec:
             secretKeyRef:
               name: cloudflare-tunnel
               key: token
+        - name: TUNNEL_ORIGIN_CA_POOL
+          value: /etc/cloudflared/certs/ca.crt
+        volumeMounts:
+        - name: ca-certs
+          mountPath: /etc/cloudflared/certs
+          readOnly: true
         resources:
           requests:
             memory: "64Mi"
@@ -47,3 +53,7 @@ spec:
             port: 20241
           initialDelaySeconds: 5
           periodSeconds: 5
+      volumes:
+      - name: ca-certs
+        configMap:
+          name: homelab-ca

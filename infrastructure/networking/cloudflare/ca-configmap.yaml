@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homelab-ca
+  namespace: cloudflare
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIBcTCCARigAwIBAgIQOIagtoYZf7e3zt5Sv4QP9TAKBggqhkjOPQQDAjAZMRcw
+    FQYDVQQDEw5ob21lbGFiLWszcy1jYTAeFw0yNjAxMDMwMDI2MjlaFw0yNjA0MDMw
+    MDI2MjlaMBkxFzAVBgNVBAMTDmhvbWVsYWItazNzLWNhMFkwEwYHKoZIzj0CAQYI
+    KoZIzj0DAQcDQgAEZP7Nx8nQRcdezSdJ0Jd2Il7qtPYSdCfcdhE0e+4at1A/hOZZ
+    KzfbFeSKEHgTQlqd4aq8PVexdUgPd7NSIPAMQ6NCMEAwDgYDVR0PAQH/BAQDAgKk
+    MA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFCarnNP15b9SlQgyT21NlmbISZKy
+    MAoGCCqGSM49BAMCA0cAMEQCIHubcZ0T8xTMTfY57znMFkD997hKbQU8ZB6fKjEc
+    UuOKAiBZ+exhXuVCd5AMTDZ5WuXgwHEfxDio/M2Kxt3573bFxA==
+    -----END CERTIFICATE-----
