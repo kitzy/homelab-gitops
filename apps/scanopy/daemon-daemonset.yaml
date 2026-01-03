@@ -18,7 +18,7 @@ spec:
       - name: daemon
         image: ghcr.io/scanopy/scanopy/daemon:latest
         securityContext:
-          privileged: true  # Required for ARP scanning
+          privileged: true
         resources:
           requests:
             memory: "256Mi"
@@ -43,8 +43,6 @@ spec:
           value: "30"
         - name: SCANOPY_MODE
           value: "Push"
-        - name: SCANOPY_DAEMON_PORT
-          value: "60073"
         volumeMounts:
         - name: daemon-config
           mountPath: /root/.config/daemon
