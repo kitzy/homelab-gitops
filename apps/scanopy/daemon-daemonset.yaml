@@ -27,20 +27,14 @@ spec:
             memory: "512Mi"
             cpu: "500m"
         env:
-        - name: SCANOPY_LOG_LEVEL
-          value: "info"
         - name: SCANOPY_SERVER_URL
           value: "http://scanopy-server.scanopy.svc.cluster.local:60072"
         - name: SCANOPY_PORT
           value: "60073"
-        - name: SCANOPY_BIND_ADDRESS
-          value: "0.0.0.0"
         - name: SCANOPY_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: SCANOPY_HEARTBEAT_INTERVAL
-          value: "30"
         - name: SCANOPY_MODE
           value: "Push"
         volumeMounts:
@@ -52,12 +46,14 @@ spec:
             port: 60073
           initialDelaySeconds: 15
           periodSeconds: 30
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /api/health
             port: 60073
           initialDelaySeconds: 5
           periodSeconds: 10
+          failureThreshold: 3
       volumes:
       - name: daemon-config
         emptyDir: {}
