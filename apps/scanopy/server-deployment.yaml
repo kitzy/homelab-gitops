@@ -4,11 +4,13 @@ metadata:
   name: scanopy-server
   namespace: scanopy
 spec:
+  type: NodePort
   selector:
     app: scanopy-server
   ports:
   - port: 60072
     targetPort: 60072
+    nodePort: 30072  # Accessible on any K3s node at :30072
     name: http
 ---
 apiVersion: apps/v1
@@ -51,7 +53,7 @@ spec:
         - name: SCANOPY_WEB_EXTERNAL_PATH
           value: "/app/static"
         - name: SCANOPY_PUBLIC_URL
-          value: "https://scanopy.kitzy.net"
+          value: "http://10.253.20.101:30072"  # Use any K3s node IP
         - name: SCANOPY_INTEGRATED_DAEMON_URL
           value: ""  # Daemon uses push mode
         ports:
