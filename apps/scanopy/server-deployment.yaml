@@ -44,7 +44,10 @@ spec:
         - name: SCANOPY_SERVER_PORT
           value: "60072"
         - name: SCANOPY_DATABASE_URL
-          value: "postgresql://postgres:$(POSTGRES_PASSWORD)@postgres.scanopy.svc.cluster.local:5432/scanopy"
+          valueFrom:
+            secretKeyRef:
+              name: scanopy-secrets
+              key: database-url
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
