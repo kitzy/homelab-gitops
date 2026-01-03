@@ -1,0 +1,157 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet
+  namespace: fleet
+spec:
+  selector:
+    app: fleet
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: fleet-tls
+  namespace: fleet
+spec:
+  secretName: fleet-tls-cert
+  issuerRef:
+    name: ca-issuer
+    kind: ClusterIssuer
+  commonName: fleet.fleet.svc.cluster.local
+  dnsNames:
+  - fleet.fleet.svc.cluster.local
+  - fleet.kitzy.net
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet
+  namespace: fleet
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fleet
+  template:
+    metadata:
+      labels:
+        app: fleet
+    spec:
+      containers:
+      - name: fleet
+        image: fleetdm/fleet:v4.78.0
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        env:
+        # Server config
+        - name: FLEET_SERVER_ADDRESS
+          value: "0.0.0.0:8080"
+        - name: FLEET_SERVER_CERT
+          value: "/etc/fleet/tls/tls.crt"
+        - name: FLEET_SERVER_KEY
+          value: "/etc/fleet/tls/tls.key"
+        - name: FLEET_LOGGING_JSON
+          value: "true"
+        
+        # MySQL config
+        - name: FLEET_MYSQL_ADDRESS
+          value: "mysql.fleet.svc.cluster.local:3306"
+        - name: FLEET_MYSQL_DATABASE
+          value: "fleet"
+        - name: FLEET_MYSQL_USERNAME
+          value: "fleet"
+        - name: FLEET_MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fleet-secrets
+              key: mysql-password
+        
+        # Redis config
+        - name: FLEET_REDIS_ADDRESS
+          value: "redis.fleet.svc.cluster.local:6379"
+        
+        # Secrets
+        - name: FLEET_SERVER_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: fleet-secrets
+              key: jwt-key
+        - name: FLEET_LICENSE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: fleet-secrets
+              key: license-key
+        
+        # AWS S3 config
+        - name: FLEET_S3_SOFTWARE_INSTALLERS_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: fleet-secrets
+              key: s3-bucket
+        - name: FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: fleet-secrets
+              key: s3-access-key-id
+        - name: FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: fleet-secrets
+              key: s3-secret-access-key
+        - name: FLEET_S3_SOFTWARE_INSTALLERS_REGION
+          value: "us-east-1"
+        
+        # Vulnerability scanning
+        - name: FLEET_VULNERABILITIES_DATABASES_PATH
+          value: "/tmp/vulndb"
+        - name: FLEET_VULNERABILITIES_PERIODICITY
+          value: "5m"
+        - name: FLEET_VULNERABILITIES_CURRENT_INSTANCE_CHECKS
+          value: "yes"
+        
+        # Osquery settings
+        - name: FLEET_OSQUERY_LABEL_UPDATE_INTERVAL
+          value: "1m"
+        - name: FLEET_SESSION_DURATION
+          value: "1h"
+        
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8220
+          name: osquery
+        
+        volumeMounts:
+        - name: tls-cert
+          mountPath: /etc/fleet/tls
+          readOnly: true
+        
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTPS
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      
+      volumes:
+      - name: tls-cert
+        secret:
+          secretName: fleet-tls-cert
