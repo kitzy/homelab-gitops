@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - hello-world
   - fleet
+  - scanopy
