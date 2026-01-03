@@ -38,6 +38,11 @@ spec:
               fieldPath: spec.nodeName
         - name: SCANOPY_MODE
           value: "Push"
+        - name: SCANOPY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: scanopy-secrets
+              key: daemon-api-key
         volumeMounts:
         - name: daemon-config
           mountPath: /root/.config/daemon
