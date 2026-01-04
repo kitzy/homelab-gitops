@@ -5,6 +5,7 @@ resources:
   - external-secret.yaml
   - postgres-statefulset.yaml
   - nginx-config.yaml
+  - media-pvc.yaml
   - authentik-server-deployment.yaml
   - authentik-worker-deployment.yaml
   - certificate.yaml
