@@ -6,6 +6,8 @@ metadata:
   annotations:
     # Enable TLS with automatic Let's Encrypt certificates
     tailscale.com/tls: "true"
+    # Override the generated hostname (namespace-ingressname)
+    tailscale.com/hostname: "hello"
 spec:
   ingressClassName: tailscale
   defaultBackend:
