@@ -5,4 +5,3 @@ resources:
   - external-secret.yaml
   - postgres-statefulset.yaml
   - server-deployment.yaml
-  - daemon-daemonset.yaml
