@@ -4,9 +4,11 @@ metadata:
   name: backup-storage
 spec:
   capacity:
-    storage: 1Ti  # Arbitrary, NFS doesn't enforce
+    storage: 1Ti
   accessModes:
     - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs
   nfs:
     server: 10gb-nas.kitzy.net
     path: /volume1/k8s-backups
