@@ -1,0 +1,39 @@
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: tailscale
+  namespace: tailscale
+spec:
+  interval: 1h
+  url: https://pkgs.tailscale.com/helmcharts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: tailscale-operator
+  namespace: tailscale
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: tailscale-operator
+      version: '1.x.x'
+      sourceRef:
+        kind: HelmRepository
+        name: tailscale
+        namespace: tailscale
+  values:
+    # OAuth client credentials will be provided by external-secret
+    oauth:
+      existingSecret: operator-oauth
+    
+    operatorConfig:
+      # Hostname for the operator device
+      hostname: tailscale-operator
+      # Default tags for operator-managed devices
+      defaultTags: tag:k8s
+    
+    # Proxy configuration for ingress/egress services
+    proxyConfig:
+      # Default tags for proxy devices
+      defaultTags: tag:k8s
