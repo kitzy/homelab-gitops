@@ -42,13 +42,6 @@ data:
         
         client_max_body_size 100M;
         
-        # Serve static media files directly
-        location /media/ {
-          alias /media/;
-          expires 30d;
-          add_header Cache-Control "public, immutable";
-        }
-        
         location / {
           proxy_pass http://authentik;
           proxy_http_version 1.1;
