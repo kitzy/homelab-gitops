@@ -4,3 +4,4 @@ resources:
   - hello-world
   - fleet
   - scanopy
+  - authentik
