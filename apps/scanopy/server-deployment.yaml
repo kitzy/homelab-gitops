@@ -11,21 +11,6 @@ spec:
     port: 60072
     targetPort: 60072
 ---
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: scanopy-tls
-  namespace: scanopy
-spec:
-  secretName: scanopy-tls-cert
-  issuerRef:
-    name: ca-issuer
-    kind: ClusterIssuer
-  commonName: scanopy-server.scanopy.svc.cluster.local
-  dnsNames:
-  - scanopy-server.scanopy.svc.cluster.local
-  - scanopy.kitzy.net
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -72,33 +57,18 @@ spec:
           value: "https://scanopy.kitzy.net"
         - name: SCANOPY_INTEGRATED_DAEMON_URL
           value: ""  # Daemon uses push mode
-        - name: SCANOPY_SERVER_TLS_CERT
-          value: "/etc/scanopy/tls/tls.crt"
-        - name: SCANOPY_SERVER_TLS_KEY
-          value: "/etc/scanopy/tls/tls.key"
         ports:
         - containerPort: 60072
           name: http
-        volumeMounts:
-        - name: tls-cert
-          mountPath: /etc/scanopy/tls
-          readOnly: true
         livenessProbe:
           httpGet:
             path: /
             port: 60072
-            scheme: HTTPS
           initialDelaySeconds: 30
           periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /
             port: 60072
-            scheme: HTTPS
           initialDelaySeconds: 10
           periodSeconds: 10
-      
-      volumes:
-      - name: tls-cert
-        secret:
-          secretName: scanopy-tls-cert
