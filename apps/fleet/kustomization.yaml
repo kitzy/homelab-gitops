@@ -5,4 +5,5 @@ resources:
   - external-secret.yaml
   - mysql-statefulset.yaml
   - redis-deployment.yaml
+  - fleet-pvc.yaml
   - fleet-deployment.yaml

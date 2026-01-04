@@ -112,7 +112,7 @@ spec:
         
         # Vulnerability scanning
         - name: FLEET_VULNERABILITIES_DATABASES_PATH
-          value: "/tmp/vulndb"
+          value: "/var/lib/fleet/vulndb"
         - name: FLEET_VULNERABILITIES_PERIODICITY
           value: "5m"
         - name: FLEET_VULNERABILITIES_CURRENT_INSTANCE_CHECKS
@@ -134,6 +134,10 @@ spec:
         - name: tls-cert
           mountPath: /etc/fleet/tls
           readOnly: true
+        - name: vulndb
+          mountPath: /var/lib/fleet/vulndb
+        - name: logs
+          mountPath: /var/log/fleet
         
         livenessProbe:
           httpGet:
@@ -155,3 +159,9 @@ spec:
       - name: tls-cert
         secret:
           secretName: fleet-tls-cert
+      - name: vulndb
+        persistentVolumeClaim:
+          claimName: fleet-vulndb
+      - name: logs
+        persistentVolumeClaim:
+          claimName: fleet-logs
