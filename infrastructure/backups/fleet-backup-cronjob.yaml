@@ -13,6 +13,13 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
           containers:
           - name: backup
             image: mysql:8.0
