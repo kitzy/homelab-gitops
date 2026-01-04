@@ -32,7 +32,7 @@ spec:
       containers:
       - name: server
         image: ghcr.io/goauthentik/server:2024.12.1
-        command:
+        args:
         - server
         resources:
           requests:
