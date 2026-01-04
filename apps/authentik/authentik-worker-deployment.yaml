@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: ghcr.io/goauthentik/server:2024.12.1
+        image: ghcr.io/goauthentik/server:2025.10.1
         command: ["/lifecycle/ak"]
         args: ["worker"]
         resources:
@@ -26,8 +26,6 @@ spec:
             memory: "1Gi"
             cpu: "1000m"
         env:
-        - name: AUTHENTIK_REDIS__HOST
-          value: redis
         - name: AUTHENTIK_POSTGRESQL__HOST
           value: postgres
         - name: AUTHENTIK_POSTGRESQL__NAME
