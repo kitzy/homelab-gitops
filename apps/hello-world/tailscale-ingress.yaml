@@ -3,13 +3,11 @@ kind: Ingress
 metadata:
   name: hello
   namespace: hello-world
-  annotations:
-    # Enable TLS with automatic Let's Encrypt certificates
-    tailscale.com/tls: "true"
-    # Override the generated hostname (namespace-ingressname)
-    tailscale.com/hostname: "hello"
 spec:
   ingressClassName: tailscale
+  tls:
+    - hosts:
+        - hello.tail26a1d8.ts.net
   defaultBackend:
     service:
       name: hello-world
