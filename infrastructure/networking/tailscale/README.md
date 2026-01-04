@@ -64,28 +64,23 @@ kind: Ingress
 metadata:
   name: my-app
   namespace: my-app
-  annotations:
-    # Use TLS with Let's Encrypt
-    tailscale.com/tls: "true"
 spec:
   ingressClassName: tailscale
-  rules:
-    - host: my-app
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: my-app
-                port:
-                  number: 80
+  tls:
+    - hosts:
+        - my-app.your-tailnet.ts.net
+  defaultBackend:
+    service:
+      name: my-app
+      port:
+        number: 80
 ```
 
 This will:
-- Create a Tailscale device named `my-app` in your tailnet
-- Expose the service at `https://my-app.<tailnet-name>.ts.net`
+- Create a Tailscale device in your tailnet
+- Expose the service at `https://my-app.your-tailnet.ts.net`
 - Automatically provision TLS certificates from Let's Encrypt
+- The hostname is controlled by `spec.tls.hosts` (use your actual tailnet domain)
 
 ### Exposing a Service with LoadBalancer
 

@@ -16,23 +16,19 @@ kind: Ingress
 metadata:
   name: hello-world-tailscale
   namespace: hello-world
-  annotations:
-    # Enable TLS with automatic Let's Encrypt certificates
-    tailscale.com/tls: "true"
 spec:
   ingressClassName: tailscale
-  rules:
-    - host: hello-world-internal
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: hello-world
-                port:
-                  number: 80
+  tls:
+    - hosts:
+        - hello-world.your-tailnet.ts.net
+  defaultBackend:
+    service:
+      name: hello-world
+      port:
+        number: 80
 ```
+
+**Note**: Replace `your-tailnet` with your actual Tailscale tailnet name (e.g., `tail26a1d8`).
 
 ### Add to Kustomization
 
@@ -51,7 +47,7 @@ resources:
 
 Now your app will be accessible at:
 - **Public**: `https://hello-world.yourdomain.com` (via Cloudflare)
-- **Private**: `https://hello-world-internal.<tailnet>.ts.net` (via Tailscale)
+- **Private**: `https://hello-world.your-tailnet.ts.net` (via Tailscale, only from devices on your tailnet)
 
 ## Option 2: Use Only Tailscale
 
@@ -87,22 +83,18 @@ metadata:
   name: fleet-admin
   namespace: fleet
   annotations:
-    tailscale.com/tls: "true"
     # Optional: Add Tailscale ACL tags
     tailscale.com/tags: "tag:k8s,tag:admin"
 spec:
   ingressClassName: tailscale
-  rules:
-    - host: fleet-admin
-      http:
-        paths:
-          - path: /admin
-            pathType: Prefix
-            backend:
-              service:
-                name: fleet
-                port:
-                  number: 8080
+  tls:
+    - hosts:
+        - fleet-admin.your-tailnet.ts.net
+  defaultBackend:
+    service:
+      name: fleet
+      port:
+        number: 8080
 ```
 
 ## Benefits of Dual Exposure
@@ -130,4 +122,11 @@ kubectl get ingress -n hello-world
 kubectl logs -n tailscale deployment/tailscale-operator
 ```
 
-You can then access your service at `https://hello-world-internal.<tailnet-name>.ts.net` from any device connected to your Tailnet!
+You can then access your service at `https://hello-world.your-tailnet.ts.net` from any device connected to your Tailnet!
+
+## Important Notes
+
+- **Hostname Control**: Use `spec.tls.hosts` to specify the exact hostname for your service
+- **TLS Certificates**: Let's Encrypt certificates are automatically provisioned on first HTTPS access
+- **Certificate Transparency**: The first access may show a CT error for a few minutes while CT logs propagate
+- **Tailnet Name**: Replace `your-tailnet` with your actual Tailscale tailnet domain (find it at https://login.tailscale.com/admin/dns)
