@@ -10,6 +10,16 @@ data:
     }
     
     http {
+      # MIME types
+      types {
+        image/png png;
+        image/jpeg jpg jpeg;
+        image/gif gif;
+        image/svg+xml svg;
+        image/webp webp;
+      }
+      default_type application/octet-stream;
+      
       upstream authentik {
         server 127.0.0.1:9000;
       }
@@ -31,6 +41,13 @@ data:
         ssl_prefer_server_ciphers on;
         
         client_max_body_size 100M;
+        
+        # Serve static media files directly
+        location /media/ {
+          alias /media/;
+          expires 30d;
+          add_header Cache-Control "public, immutable";
+        }
         
         location / {
           proxy_pass http://authentik;
