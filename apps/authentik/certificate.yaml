@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: authentik-tls
+  namespace: authentik
+spec:
+  secretName: authentik-tls
+  dnsNames:
+  - auth.kitzy.net
+  - authentik-server.authentik.svc.cluster.local
+  issuerRef:
+    name: ca-issuer
+    kind: ClusterIssuer
