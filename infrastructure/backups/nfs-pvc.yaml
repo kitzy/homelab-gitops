@@ -6,7 +6,8 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
+  storageClassName: nfs
+  volumeName: backup-storage
   resources:
     requests:
       storage: 1Ti
-  volumeName: backup-storage
