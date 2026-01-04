@@ -4,10 +4,8 @@ metadata:
   name: hello
   namespace: hello-world
   annotations:
-    # Enable TLS with automatic Let's Encrypt certificates
-    tailscale.com/tls: "true"
-    # Override the generated hostname (namespace-ingressname)
-    tailscale.com/hostname: "hello"
+    # Enable Funnel to expose service publicly with Let's Encrypt certificates
+    tailscale.com/funnel: "true"
 spec:
   ingressClassName: tailscale
   defaultBackend:
