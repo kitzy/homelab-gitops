@@ -3,11 +3,11 @@ kind: Ingress
 metadata:
   name: hello
   namespace: hello-world
-  annotations:
-    # Enable Funnel to expose service publicly with Let's Encrypt certificates
-    tailscale.com/funnel: "true"
 spec:
   ingressClassName: tailscale
+  tls:
+    - hosts:
+        - hello.tail26a1d8.ts.net
   defaultBackend:
     service:
       name: hello-world
