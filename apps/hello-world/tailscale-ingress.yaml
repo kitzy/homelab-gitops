@@ -1,13 +1,11 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: hello-world-tailscale
+  name: hello
   namespace: hello-world
   annotations:
     # Enable TLS with automatic Let's Encrypt certificates
     tailscale.com/tls: "true"
-    # Set custom hostname
-    tailscale.com/hostname: "hello"
 spec:
   ingressClassName: tailscale
   defaultBackend:
