@@ -6,16 +6,12 @@ metadata:
   annotations:
     # Enable TLS with automatic Let's Encrypt certificates
     tailscale.com/tls: "true"
+    # Set custom hostname
+    tailscale.com/hostname: "hello"
 spec:
   ingressClassName: tailscale
-  rules:
-    - host: hello
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: hello-world
-                port:
-                  number: 443
+  defaultBackend:
+    service:
+      name: hello-world
+      port:
+        number: 443
