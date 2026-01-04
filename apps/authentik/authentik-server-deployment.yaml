@@ -29,6 +29,13 @@ spec:
       labels:
         app: authentik-server
     spec:
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ['sh', '-c', 'mkdir -p /media/public && chown -R 1000:1000 /media']
+        volumeMounts:
+        - name: media
+          mountPath: /media
       containers:
       - name: server
         image: ghcr.io/goauthentik/server:2025.10.1
