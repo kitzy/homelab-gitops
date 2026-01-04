@@ -38,10 +38,10 @@ spec:
         - server
         resources:
           requests:
-            memory: "2Gi"
+            memory: "3Gi"
             cpu: "250m"
           limits:
-            memory: "4Gi"
+            memory: "6Gi"
             cpu: "1000m"
         env:
         - name: AUTHENTIK_POSTGRESQL__HOST
@@ -101,7 +101,7 @@ spec:
             path: /-/health/live/
             port: 9000
             scheme: HTTP
-          initialDelaySeconds: 60
+          initialDelaySeconds: 300
           periodSeconds: 30
           timeoutSeconds: 5
         readinessProbe:
@@ -109,7 +109,7 @@ spec:
             path: /-/health/ready/
             port: 9000
             scheme: HTTP
-          initialDelaySeconds: 30
+          initialDelaySeconds: 300
           periodSeconds: 10
           timeoutSeconds: 5
         volumeMounts:
