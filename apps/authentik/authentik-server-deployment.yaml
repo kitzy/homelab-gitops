@@ -142,7 +142,8 @@ spec:
             cpu: "100m"
       volumes:
       - name: media
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: authentik-media
       - name: templates
         emptyDir: {}
       - name: nginx-config
