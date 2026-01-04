@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello-world-tailscale
+  namespace: hello-world
+  annotations:
+    # Enable TLS with automatic Let's Encrypt certificates
+    tailscale.com/tls: "true"
+spec:
+  ingressClassName: tailscale
+  rules:
+    - host: hello
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-world
+                port:
+                  number: 443
