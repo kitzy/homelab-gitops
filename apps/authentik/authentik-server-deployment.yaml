@@ -130,6 +130,9 @@ spec:
         - name: tls-cert
           mountPath: /etc/nginx/tls
           readOnly: true
+        - name: media
+          mountPath: /media
+          readOnly: true
         resources:
           requests:
             memory: "64Mi"
