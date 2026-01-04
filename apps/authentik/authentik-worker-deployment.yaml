@@ -16,8 +16,8 @@ spec:
       containers:
       - name: worker
         image: ghcr.io/goauthentik/server:2024.12.1
-        args:
-        - worker
+        command: ["/lifecycle/ak"]
+        args: ["worker"]
         resources:
           requests:
             memory: "512Mi"
