@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - nfs-storageclass.yaml
   - nfs-pv.yaml
+  - app-backup-pvs.yaml
   - nfs-pvc.yaml
   - external-secrets.yaml
   - retention-cleanup-cronjob.yaml
