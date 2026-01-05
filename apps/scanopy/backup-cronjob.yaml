@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: scanopy-postgres-backup
+  namespace: scanopy
+spec:
+  schedule: "30 2 * * *"  # 02:30 daily (offset from Fleet)
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+          containers:
+          - name: backup
+            image: postgres:17
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              BACKUP_FILE="/backups/scanopy/scanopy-$(date +%Y%m%d-%H%M%S).sql.gz"
+              echo "Starting Scanopy PostgreSQL backup to $BACKUP_FILE"
+              
+              pg_dump \
+                --host=postgres.scanopy.svc.cluster.local \
+                --username=postgres \
+                --no-password \
+                --format=plain \
+                scanopy | gzip > "$BACKUP_FILE"
+              
+              echo "Backup completed: $(ls -lh $BACKUP_FILE)"
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: scanopy-secrets
+                  key: postgres-password
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-storage

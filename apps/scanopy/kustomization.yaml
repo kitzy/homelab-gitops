@@ -5,3 +5,5 @@ resources:
   - external-secret.yaml
   - postgres-statefulset.yaml
   - server-deployment.yaml
+  - backup-storage-pvc.yaml
+  - backup-cronjob.yaml

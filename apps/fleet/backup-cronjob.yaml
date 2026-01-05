@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: fleet-mysql-backup
+  namespace: fleet
+spec:
+  schedule: "0 2 * * *"  # 02:00 daily
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+          containers:
+          - name: backup
+            image: mysql:8.0
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              BACKUP_FILE="/backups/fleet/fleet-$(date +%Y%m%d-%H%M%S).sql.gz"
+              echo "Starting Fleet MySQL backup to $BACKUP_FILE"
+              
+              mysqldump \
+                --host=mysql.fleet.svc.cluster.local \
+                --user=root \
+                --password="$MYSQL_ROOT_PASSWORD" \
+                --single-transaction \
+                --routines \
+                --triggers \
+                --events \
+                fleet | gzip > "$BACKUP_FILE"
+              
+              echo "Backup completed: $(ls -lh $BACKUP_FILE)"
+            env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fleet-secrets
+                  key: mysql-password
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-storage
