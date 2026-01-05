@@ -30,14 +30,14 @@ spec:
               set -e
               BACKUP_FILE="/backups/authentik/authentik-$(date +%Y%m%d-%H%M%S).sql.gz"
               echo "Starting Authentik PostgreSQL backup to $BACKUP_FILE"
-              
+
               pg_dump \
                 --host=postgres.authentik.svc.cluster.local \
                 --username="$POSTGRES_USER" \
                 --no-password \
                 --format=plain \
                 "$POSTGRES_DB" | gzip > "$BACKUP_FILE"
-              
+
               echo "Backup completed: $(ls -lh $BACKUP_FILE)"
             env:
             - name: POSTGRES_DB

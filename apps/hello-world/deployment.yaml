@@ -68,7 +68,7 @@ data:
             }
             h1 { font-size: 3rem; margin: 0; }
             p { font-size: 1.2rem; margin: 1rem 0; }
-            .info { 
+            .info {
                 background: rgba(0, 0, 0, 0.2);
                 padding: 1rem;
                 border-radius: 5px;
@@ -101,13 +101,13 @@ data:
     server {
         listen 443 ssl;
         server_name hello.kitzy.net hello-world.hello-world.svc.cluster.local;
-        
+
         ssl_certificate /etc/nginx/ssl/tls.crt;
         ssl_certificate_key /etc/nginx/ssl/tls.key;
-        
+
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers HIGH:!aNULL:!MD5;
-        
+
         location / {
             root /usr/share/nginx/html;
             index index.html;

@@ -1,0 +1,71 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**.yaml'
+      - '**.yml'
+
+jobs:
+  yaml-lint:
+    name: Lint YAML Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Run yamllint
+        run: yamllint -f parsable .
+
+  validate-kubernetes:
+    name: Validate Kubernetes Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Validate YAML files
+        run: |
+          find . -type f \( -name "*.yaml" -o -name "*.yml" \) | while read file; do
+            echo "Validating $file"
+            kubectl apply --dry-run=client -f "$file" 2>&1 || true
+          done
+
+  validate-kustomize:
+    name: Validate Kustomize Builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Build Kustomize manifests
+        run: |
+          # Find all kustomization.yaml files and build them
+          find . -name "kustomization.yaml" | while read kustomize_file; do
+            dir=$(dirname "$kustomize_file")
+            echo "Building Kustomize manifest in $dir"
+            kubectl kustomize "$dir" > /dev/null || {
+              echo "::error file=$kustomize_file::Failed to build Kustomize manifest in $dir"
+              exit 1
+            }
+          done
