@@ -7,3 +7,5 @@ resources:
   - redis-deployment.yaml
   - fleet-pvc.yaml
   - fleet-deployment.yaml
+  - backup-storage-pvc.yaml
+  - backup-cronjob.yaml

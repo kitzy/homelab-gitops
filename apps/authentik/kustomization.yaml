@@ -9,3 +9,5 @@ resources:
   - authentik-server-deployment.yaml
   - authentik-worker-deployment.yaml
   - certificate.yaml
+  - backup-storage-pvc.yaml
+  - backup-cronjob.yaml

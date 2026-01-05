@@ -3,6 +3,8 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - portainer-pvc.yaml
+  - backup-storage-pvc.yaml
   - portainer-deployment.yaml
   - service.yaml
   - tailscale-ingress.yaml
+  - backup-cronjob.yaml

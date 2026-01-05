@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: authentik-postgres-backup
+  namespace: authentik
+spec:
+  schedule: "0 3 * * *"  # 03:00 daily (offset from Fleet and Scanopy)
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+          containers:
+          - name: backup
+            image: postgres:17
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              BACKUP_FILE="/backups/authentik/authentik-$(date +%Y%m%d-%H%M%S).sql.gz"
+              echo "Starting Authentik PostgreSQL backup to $BACKUP_FILE"
+              
+              pg_dump \
+                --host=postgres.authentik.svc.cluster.local \
+                --username="$POSTGRES_USER" \
+                --no-password \
+                --format=plain \
+                "$POSTGRES_DB" | gzip > "$BACKUP_FILE"
+              
+              echo "Backup completed: $(ls -lh $BACKUP_FILE)"
+            env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secrets
+                  key: postgres-db
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secrets
+                  key: postgres-user
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secrets
+                  key: postgres-password
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-storage
