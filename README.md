@@ -47,13 +47,19 @@ Developer                 GitHub                    K3s Cluster
 
 **Sync mechanism:**
 - **Webhook-triggered**: GitHub webhook notifies Flux on every push (~5 second sync)
-- **Polling fallback**: Flux polls repository every 1 minute as backup
+- **Polling fallback**: Flux polls repository every 1 hour as backup
+- **GitHub Actions**: Automated Flux reconciliation via ephemeral Tailscale connection (see [.github/README.md](.github/README.md))
 - **Manual trigger**: `flux reconcile kustomization apps --with-source` forces immediate sync
 
 ## Repository structure
 
 ```
 homelab-gitops/
+├── .github/                 # GitHub Actions workflows
+│   ├── workflows/
+│   │   └── flux-reconcile.yaml  # Automated Flux reconciliation
+│   └── README.md            # GitHub Actions setup guide
+│
 ├── infrastructure/           # Core cluster infrastructure
 │   ├── sources/             # Helm chart repositories
 │   │   ├── jetstack.yaml
@@ -64,6 +70,9 @@ homelab-gitops/
 │   │   ├── external-secrets/
 │   │   ├── 1password-connect/
 │   │   └── cloudflare/
+│   ├── networking/          # Networking components
+│   │   ├── cloudflare/
+│   │   └── tailscale/       # Tailscale Kubernetes Operator
 │   └── kustomization.yaml   # Infrastructure root kustomization
 │
 ├── apps/                    # Application deployments
@@ -98,7 +107,12 @@ homelab-gitops/
    git commit -m "Add new service"
    git push
    ```
-3. **Watch Flux sync** (usually completes in 5-10 seconds):
+3. **Automatic reconciliation** happens via:
+   - **Flux webhook**: Triggered on push (~5 seconds)
+   - **GitHub Actions**: Automated workflow triggers Flux reconciliation
+   - **Polling**: Flux checks every 1 hour as fallback
+
+4. **Watch Flux sync** (usually completes in 5-10 seconds):
    ```bash
    flux get kustomizations --watch
    ```
@@ -216,6 +230,27 @@ flux suspend kustomization apps
 flux resume kustomization apps
 ```
 
+### Manual reconciliation
+
+You can manually trigger Flux reconciliation in multiple ways:
+
+**Using Flux CLI (from local machine):**
+```bash
+# Reconcile specific kustomization
+flux reconcile kustomization apps --with-source
+
+# Reconcile all infrastructure
+flux reconcile kustomization infrastructure-core --with-source
+```
+
+**Using GitHub Actions:**
+- Go to the [Actions tab](../../actions/workflows/flux-reconcile.yaml)
+- Click "Run workflow"
+- Optionally specify a kustomization name
+- The workflow uses an ephemeral Tailscale connection to securely access the cluster
+
+See [.github/README.md](.github/README.md) for GitHub Actions setup details.
+
 ### View Flux logs
 
 ```bash
@@ -261,25 +296,8 @@ flux reconcile kustomization apps --with-source
 - Invalid YAML syntax (check with `kubectl apply --dry-run=client`)
 - Missing namespace (ensure namespace exists before resources)
 - Dependency ordering (use `dependsOn` in kustomization.yaml)
-- Webhook not triggering (check GitHub webhook delivery)
 
-### Webhook not working
-
-**Check webhook configuration:**
-```bash
-# Get webhook URL
-flux create receiver github-receiver \
-  --type github \
-  --event ping,push \
-  --secret-ref webhook-token \
-  --resource GitRepository/flux-system \
-  --export
-
-# Test webhook from GitHub
-# Go to repo Settings → Webhooks → click webhook → Recent Deliveries → Redeliver
-```
-
-**Fallback:** Flux polls every 1 minute regardless of webhook
+**Note:** This repository uses GitHub Actions for webhook-style triggering instead of traditional Flux webhooks.
 
 ### ExternalSecret not syncing
 
