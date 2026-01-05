@@ -1,0 +1,88 @@
+name: Flux Reconcile
+
+on:
+  workflow_dispatch:
+    inputs:
+      kustomization:
+        description: 'Kustomization to reconcile (leave empty for all)'
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'infrastructure/**'
+      - 'clusters/**'
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        id: op-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          TAILSCALE_OAUTH_CLIENT_ID: op://Github/homelab-gitops/tailscale_oauth_client_id
+          TAILSCALE_OAUTH_SECRET: op://Github/homelab-gitops/tailscale_oauth_secret
+          KUBECONFIG_BASE64: op://Github/homelab-gitops/kubeconfig
+
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_SECRET }}
+          tags: tag:ci
+          args: --accept-routes
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.33.0'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ steps.op-secrets.outputs.KUBECONFIG_BASE64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster connection
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@main
+
+      - name: Reconcile Flux
+        run: |
+          if [ -n "${{ github.event.inputs.kustomization }}" ]; then
+            echo "Reconciling kustomization: ${{ github.event.inputs.kustomization }}"
+            flux reconcile kustomization ${{ github.event.inputs.kustomization }} --with-source
+          else
+            echo "Reconciling all kustomizations"
+            flux reconcile source git flux-system
+            flux reconcile kustomization infrastructure-sources --with-source
+            flux reconcile kustomization infrastructure-core --with-source
+            flux reconcile kustomization infrastructure-networking --with-source
+            flux reconcile kustomization infrastructure-backups --with-source
+            flux reconcile kustomization apps --with-source
+          fi
+
+      - name: Check Flux status
+        if: always()
+        run: |
+          echo "=== Flux Sources ==="
+          flux get sources git
+          echo ""
+          echo "=== Flux Kustomizations ==="
+          flux get kustomizations
+          echo ""
+          echo "=== Flux Helm Releases ==="
+          flux get helmreleases -A
