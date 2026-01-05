@@ -9,4 +9,5 @@ resources:
   - fleet-backup-cronjob.yaml
   - scanopy-backup-cronjob.yaml
   - authentik-backup-cronjob.yaml
+  - portainer-backup-cronjob.yaml
   - retention-cleanup-cronjob.yaml
