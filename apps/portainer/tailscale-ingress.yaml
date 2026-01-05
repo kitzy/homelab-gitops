@@ -12,4 +12,4 @@ spec:
     service:
       name: portainer
       port:
-        number: 9443
+        number: 9000
