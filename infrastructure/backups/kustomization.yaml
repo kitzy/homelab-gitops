@@ -8,4 +8,5 @@ resources:
   - external-secrets.yaml
   - fleet-backup-cronjob.yaml
   - scanopy-backup-cronjob.yaml
+  - authentik-backup-cronjob.yaml
   - retention-cleanup-cronjob.yaml
