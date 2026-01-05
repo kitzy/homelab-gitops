@@ -30,7 +30,7 @@ spec:
               set -e
               BACKUP_FILE="/backups/fleet/fleet-$(date +%Y%m%d-%H%M%S).sql.gz"
               echo "Starting Fleet MySQL backup to $BACKUP_FILE"
-              
+
               mysqldump \
                 --host=mysql.fleet.svc.cluster.local \
                 --user=root \
@@ -40,7 +40,7 @@ spec:
                 --triggers \
                 --events \
                 fleet | gzip > "$BACKUP_FILE"
-              
+
               echo "Backup completed: $(ls -lh $BACKUP_FILE)"
             env:
             - name: MYSQL_ROOT_PASSWORD

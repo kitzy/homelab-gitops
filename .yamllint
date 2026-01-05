@@ -1,0 +1,12 @@
+---
+extends: relaxed
+
+rules:
+  line-length:
+    max: 120
+    level: warning
+  trailing-spaces: enable
+  new-line-at-end-of-file: enable
+
+ignore: |
+  clusters/production/flux-system/gotk-components.yaml

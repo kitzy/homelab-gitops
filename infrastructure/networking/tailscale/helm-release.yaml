@@ -26,13 +26,13 @@ spec:
     # OAuth client credentials will be provided by external-secret
     oauth:
       existingSecret: operator-oauth
-    
+
     operatorConfig:
       # Hostname for the operator device
       hostname: tailscale-operator
       # Default tags for operator-managed devices
       defaultTags: tag:k8s
-    
+
     # Proxy configuration for ingress/egress services
     proxyConfig:
       # Default tags for proxy devices

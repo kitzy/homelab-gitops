@@ -61,7 +61,7 @@ spec:
           value: "/etc/fleet/tls/tls.key"
         - name: FLEET_LOGGING_JSON
           value: "true"
-        
+
         # MySQL config
         - name: FLEET_MYSQL_ADDRESS
           value: "mysql.fleet.svc.cluster.local:3306"
@@ -74,11 +74,11 @@ spec:
             secretKeyRef:
               name: fleet-secrets
               key: mysql-password
-        
+
         # Redis config
         - name: FLEET_REDIS_ADDRESS
           value: "redis.fleet.svc.cluster.local:6379"
-        
+
         # Secrets
         - name: FLEET_SERVER_PRIVATE_KEY
           valueFrom:
@@ -90,7 +90,7 @@ spec:
             secretKeyRef:
               name: fleet-secrets
               key: license-key
-        
+
         # AWS S3 config
         - name: FLEET_S3_SOFTWARE_INSTALLERS_BUCKET
           valueFrom:
@@ -109,7 +109,7 @@ spec:
               key: s3-secret-access-key
         - name: FLEET_S3_SOFTWARE_INSTALLERS_REGION
           value: "us-east-1"
-        
+
         # Vulnerability scanning
         - name: FLEET_VULNERABILITIES_DATABASES_PATH
           value: "/var/lib/fleet/vulndb"
@@ -117,17 +117,17 @@ spec:
           value: "5m"
         - name: FLEET_VULNERABILITIES_CURRENT_INSTANCE_CHECKS
           value: "yes"
-        
+
         # Osquery settings
         - name: FLEET_OSQUERY_LABEL_UPDATE_INTERVAL
           value: "1m"
         - name: FLEET_SESSION_DURATION
           value: "1h"
-        
+
         ports:
         - containerPort: 8080
           name: http
-        
+
         volumeMounts:
         - name: tls-cert
           mountPath: /etc/fleet/tls
@@ -136,7 +136,7 @@ spec:
           mountPath: /var/lib/fleet/vulndb
         - name: logs
           mountPath: /var/log/fleet
-        
+
         livenessProbe:
           httpGet:
             path: /healthz
@@ -144,7 +144,7 @@ spec:
             scheme: HTTPS
           initialDelaySeconds: 60
           periodSeconds: 30
-        
+
         readinessProbe:
           httpGet:
             path: /healthz
@@ -152,7 +152,7 @@ spec:
             scheme: HTTPS
           initialDelaySeconds: 30
           periodSeconds: 10
-      
+
       volumes:
       - name: tls-cert
         secret:

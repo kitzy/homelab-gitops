@@ -25,10 +25,7 @@ jobs:
         run: pip install yamllint
 
       - name: Run yamllint
-        run: |
-          yamllint -f parsable \
-            -d "{extends: relaxed, rules: {line-length: {max: 120}}}" \
-            .
+        run: yamllint -f parsable .
 
   validate-kubernetes:
     name: Validate Kubernetes Manifests
