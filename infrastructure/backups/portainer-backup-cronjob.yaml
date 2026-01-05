@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: portainer-backup
-  namespace: backups
+  namespace: portainer
 spec:
   schedule: "0 3 * * *"  # 03:00 daily
   successfulJobsHistoryLimit: 3
