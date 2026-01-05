@@ -4,3 +4,4 @@ resources:
   - namespace.yaml
   - external-secret.yaml
   - helm-release.yaml
+  - k8s-api-service.yaml
