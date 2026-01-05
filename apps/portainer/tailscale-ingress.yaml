@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portainer
+  namespace: portainer
+spec:
+  ingressClassName: tailscale
+  tls:
+    - hosts:
+        - portainer.tail26a1d8.ts.net
+  defaultBackend:
+    service:
+      name: portainer
+      port:
+        number: 9443
