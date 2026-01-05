@@ -47,7 +47,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: fleet-secrets
-                  key: mysql-password
+                  key: mysql-root-password
             volumeMounts:
             - name: backup-storage
               mountPath: /backups
