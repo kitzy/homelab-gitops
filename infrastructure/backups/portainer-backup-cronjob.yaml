@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: portainer-backup
+  namespace: backups
+spec:
+  schedule: "0 3 * * *"  # 03:00 daily
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+          containers:
+          - name: backup
+            image: busybox:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              BACKUP_FILE="/backups/portainer/portainer-$(date +%Y%m%d-%H%M%S).tar.gz"
+              echo "Starting Portainer backup to $BACKUP_FILE"
+              
+              # Create backup directory if it doesn't exist
+              mkdir -p /backups/portainer
+              
+              # Create tar archive of Portainer data
+              tar -czf "$BACKUP_FILE" -C /data .
+              
+              echo "Backup completed: $(ls -lh $BACKUP_FILE)"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            - name: portainer-data
+              mountPath: /data
+              readOnly: true
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-storage
+          - name: portainer-data
+            persistentVolumeClaim:
+              claimName: portainer-data
