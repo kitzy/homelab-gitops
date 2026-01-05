@@ -34,7 +34,7 @@ jobs:
           KUBECONFIG_BASE64: op://Github/homelab-gitops/kubeconfig
 
       - name: Setup Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@main
         with:
           oauth-client-id: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_SECRET }}
