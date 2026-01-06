@@ -29,35 +29,15 @@ jobs:
           export-env: false
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          TAILSCALE_OAUTH_CLIENT_ID: op://Github/homelab-gitops/tailscale_oauth_client_id
-          TAILSCALE_OAUTH_SECRET: op://Github/homelab-gitops/tailscale_oauth_secret
+          TAILSCALE_AUTH_KEY: op://Github/Tailscale/TAILSCALE_AUTH_KEY
           KUBECONFIG_BASE64: op://Github/homelab-gitops/kubeconfig
 
       - name: Setup Tailscale
-        id: tailscale-setup
-        continue-on-error: true
         uses: tailscale/github-action@v4
         with:
-          oauth-client-id: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_SECRET }}
-          tags: tag:ci
+          authkey: ${{ steps.op-secrets.outputs.TAILSCALE_AUTH_KEY }}
           args: --accept-routes
           version: latest
-
-      - name: Debug OAuth credentials format
-        if: steps.tailscale-setup.outcome == 'failure'
-        run: |
-          echo "Client ID length: ${#TAILSCALE_OAUTH_CLIENT_ID}"
-          echo "Secret length: ${#TAILSCALE_OAUTH_SECRET}"
-          echo "Client ID starts with: ${TAILSCALE_OAUTH_CLIENT_ID:0:10}..."
-          echo "Secret starts with: ${TAILSCALE_OAUTH_SECRET:0:10}..."
-        env:
-          TAILSCALE_OAUTH_CLIENT_ID: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_CLIENT_ID }}
-          TAILSCALE_OAUTH_SECRET: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_SECRET }}
-
-      - name: Check if Tailscale is actually needed
-        if: steps.tailscale-setup.outcome == 'failure'
-        run: exit 1
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
