@@ -33,11 +33,10 @@ jobs:
           KUBECONFIG_BASE64: op://Github/homelab-gitops/kubeconfig
 
       - name: Setup Tailscale
-        uses: tailscale/github-action@v4
+        uses: tailscale/github-action@v3
         with:
           authkey: ${{ steps.op-secrets.outputs.TAILSCALE_AUTH_KEY }}
           args: --accept-routes
-          version: latest
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
