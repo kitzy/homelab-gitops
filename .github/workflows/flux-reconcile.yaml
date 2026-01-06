@@ -34,6 +34,8 @@ jobs:
           KUBECONFIG_BASE64: op://Github/homelab-gitops/kubeconfig
 
       - name: Setup Tailscale
+        id: tailscale-setup
+        continue-on-error: true
         uses: tailscale/github-action@v4
         with:
           oauth-client-id: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_CLIENT_ID }}
@@ -42,11 +44,15 @@ jobs:
           args: --accept-routes
           version: latest
 
-      - name: Debug Tailscale connection
-        if: failure()
+      - name: Manual Tailscale setup for debugging
+        if: steps.tailscale-setup.outcome == 'failure'
         run: |
-          tailscale status || true
-          tailscale debug daemon || true
+          echo "Attempting manual Tailscale setup to see error..."
+          sudo tailscale up --auth-key="${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_CLIENT_ID }}:${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_SECRET }}" --hostname="github-actions-debug" --advertise-tags="tag:ci" --accept-routes 2>&1 || echo "Exit code: $?"
+
+      - name: Check if Tailscale is actually needed
+        if: steps.tailscale-setup.outcome == 'failure'
+        run: exit 1
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
