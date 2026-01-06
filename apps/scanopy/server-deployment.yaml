@@ -54,7 +54,7 @@ spec:
         - name: SCANOPY_WEB_EXTERNAL_PATH
           value: "/app/static"
         - name: SCANOPY_PUBLIC_URL
-          value: "https://scanopy.kitzy.net"
+          value: "https://scanopy.tail26a1d8.ts.net"
         - name: SCANOPY_INTEGRATED_DAEMON_URL
           value: ""  # Daemon uses push mode
         ports:

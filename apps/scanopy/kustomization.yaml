@@ -7,3 +7,4 @@ resources:
   - server-deployment.yaml
   - backup-storage-pvc.yaml
   - backup-cronjob.yaml
+  - tailscale-ingress.yaml
