@@ -40,6 +40,13 @@ jobs:
           oauth-secret: ${{ steps.op-secrets.outputs.TAILSCALE_OAUTH_SECRET }}
           tags: tag:ci
           args: --accept-routes
+          version: latest
+
+      - name: Debug Tailscale connection
+        if: failure()
+        run: |
+          tailscale status || true
+          tailscale debug daemon || true
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
