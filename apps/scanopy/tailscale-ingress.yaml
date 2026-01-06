@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: scanopy
+  namespace: scanopy
+spec:
+  ingressClassName: tailscale
+  tls:
+    - hosts:
+        - scanopy.tail26a1d8.ts.net
+  defaultBackend:
+    service:
+      name: scanopy-server
+      port:
+        number: 60072
