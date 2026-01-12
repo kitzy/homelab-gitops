@@ -29,14 +29,16 @@ jobs:
           export-env: false
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          TAILSCALE_AUTH_KEY: op://GitHub/Tailscale/TAILSCALE_AUTH_KEY
+          TS_OAUTH_CLIENT_ID: op://GitHub/Tailscale/OAUTH_CLIENT_ID
+          TS_OAUTH_SECRET: op://GitHub/Tailscale/OAUTH_SECRET
           KUBECONFIG_BASE64: op://GitHub/homelab-gitops/kubeconfig
           ACTIONS_STEP_DEBUG: true
 
       - name: Setup Tailscale
         uses: tailscale/github-action@v4
         with:
-          authkey: ${{ steps.op-secrets.outputs.TAILSCALE_AUTH_KEY }}
+          oauth-client-id: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
           tags: tag:ci
           version: latest
 
