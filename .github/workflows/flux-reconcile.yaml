@@ -32,70 +32,15 @@ jobs:
           TS_OAUTH_CLIENT_ID: op://GitHub/Tailscale/OAUTH_CLIENT_ID
           TS_OAUTH_SECRET: op://GitHub/Tailscale/OAUTH_SECRET
           KUBECONFIG_BASE64: op://GitHub/homelab-gitops/kubeconfig
+          ACTIONS_STEP_DEBUG: true
 
-      - name: Debug OAuth credentials
-        run: |
-          echo "Client ID: ${TS_OAUTH_CLIENT_ID}"
-          echo "Client ID length: ${#TS_OAUTH_CLIENT_ID}"
-          echo "Secret length: ${#TS_OAUTH_SECRET}"
-          echo "Secret first 15 chars: ${TS_OAUTH_SECRET:0:15}"
-          echo "Secret last 10 chars: ${TS_OAUTH_SECRET: -10}"
-          
-          # Check for whitespace
-          if [[ "$TS_OAUTH_SECRET" =~ ^[[:space:]] ]]; then
-            echo "ERROR: Secret starts with whitespace!"
-          fi
-          if [[ "$TS_OAUTH_SECRET" =~ [[:space:]]$ ]]; then
-            echo "ERROR: Secret ends with whitespace!"
-          fi
-          if [[ "$TS_OAUTH_SECRET" =~ [[:space:]] ]]; then
-            echo "WARNING: Secret contains internal whitespace!"
-          fi
-          
-          # Verify format
-          if [[ ! "$TS_OAUTH_SECRET" =~ ^tskey-client- ]]; then
-            echo "ERROR: Secret doesn't start with 'tskey-client-'"
-          fi
-        env:
-          TS_OAUTH_CLIENT_ID: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
-          TS_OAUTH_SECRET: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
-
-      - name: Install Tailscale manually
-        run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          
-      - name: Start Tailscale daemon
-        run: |
-          sudo tailscaled --tun=userspace-networking --socks5-server=localhost:1055 &
-          sleep 5
-          
-      - name: Authenticate with Tailscale (manual test)
-        run: |
-          # Combine OAuth credentials in the format Tailscale expects
-          AUTH_KEY="${TS_OAUTH_CLIENT_ID}:${TS_OAUTH_SECRET}"
-          
-          echo "Attempting manual authentication..."
-          echo "Auth key format: CLIENT_ID:SECRET"
-          echo "Combined key length: ${#AUTH_KEY}"
-          
-          sudo tailscale up \
-            --authkey="$AUTH_KEY" \
-            --accept-routes \
-            --hostname="github-runner-test" 2>&1 | tee /tmp/tailscale-auth.log || {
-              echo "=== Authentication failed ==="
-              echo "Exit code: $?"
-              cat /tmp/tailscale-auth.log
-              echo ""
-              echo "=== Tailscale status ==="
-              sudo tailscale status
-              exit 1
-            }
-          
-          echo "=== Authentication successful ==="
-          sudo tailscale status
-        env:
-          TS_OAUTH_CLIENT_ID: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
-          TS_OAUTH_SECRET: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          version: latest
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
