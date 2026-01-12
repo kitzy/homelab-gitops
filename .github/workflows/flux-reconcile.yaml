@@ -31,6 +31,7 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           TAILSCALE_AUTH_KEY: op://Github/Tailscale/TAILSCALE_AUTH_KEY
           KUBECONFIG_BASE64: op://Github/homelab-gitops/kubeconfig
+          ACTIONS_STEP_DEBUG: true
 
       - name: Setup Tailscale
         uses: tailscale/github-action@v4
