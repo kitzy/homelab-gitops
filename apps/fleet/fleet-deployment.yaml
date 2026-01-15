@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
       - name: fleet
-        image: fleetdm/fleet:v4.78.3
+        image: fleetdm/fleet:v4.79.0
         resources:
           requests:
             memory: "1Gi"
