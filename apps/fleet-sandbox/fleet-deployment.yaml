@@ -61,6 +61,8 @@ spec:
           value: "/etc/fleet/tls/tls.key"
         - name: FLEET_LOGGING_JSON
           value: "true"
+        - name: FLEET_SERVER_MAX_INSTALLER_SIZE
+          value: "20G"
 
         # MySQL config
         - name: FLEET_MYSQL_ADDRESS
