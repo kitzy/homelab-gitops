@@ -65,15 +65,15 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.kustomization }}" ]; then
             echo "Reconciling kustomization: ${{ github.event.inputs.kustomization }}"
-            flux reconcile kustomization ${{ github.event.inputs.kustomization }} --with-source
+            flux reconcile kustomization ${{ github.event.inputs.kustomization }} --with-source --timeout=10m
           else
             echo "Reconciling all kustomizations"
-            flux reconcile source git flux-system
-            flux reconcile kustomization infrastructure-sources --with-source
-            flux reconcile kustomization infrastructure-core --with-source
-            flux reconcile kustomization infrastructure-networking --with-source
-            flux reconcile kustomization infrastructure-backups --with-source
-            flux reconcile kustomization apps --with-source
+            flux reconcile source git flux-system --timeout=2m
+            flux reconcile kustomization infrastructure-sources --with-source --timeout=5m
+            flux reconcile kustomization infrastructure-core --with-source --timeout=5m
+            flux reconcile kustomization infrastructure-networking --with-source --timeout=10m
+            flux reconcile kustomization infrastructure-backups --with-source --timeout=5m
+            flux reconcile kustomization apps --with-source --timeout=5m
           fi
 
       - name: Check Flux status
