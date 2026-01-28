@@ -9,6 +9,7 @@ spec:
     - name: infrastructure-core
   path: ./infrastructure/networking
   prune: true
+  wait: true
   sourceRef:
     kind: GitRepository
     name: flux-system
