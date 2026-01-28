@@ -9,3 +9,4 @@ resources:
   - fleet-deployment.yaml
   - backup-storage-pvc.yaml
   - backup-cronjob.yaml
+  - ingress.yaml

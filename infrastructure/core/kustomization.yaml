@@ -6,3 +6,4 @@ resources:
   - onepassword-connect.yaml
   - onepassword-cluster-secret-store.yaml
   - self-signed-issuer.yaml
+  - letsencrypt-issuer.yaml
