@@ -3,5 +3,4 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - helm-release.yaml
-  # IPAddressPool will be added after MetalLB CRDs are installed
-  # - ipaddresspool.yaml
+  - ipaddresspool.yaml
