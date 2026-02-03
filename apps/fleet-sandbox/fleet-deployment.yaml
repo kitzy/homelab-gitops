@@ -41,6 +41,26 @@ spec:
       labels:
         app: fleet
     spec:
+      initContainers:
+      - name: migrate-db
+        image: fleetdm/fleet:v4.80.0
+        command:
+          - /usr/bin/fleet
+          - prepare
+          - db
+        env:
+        # MySQL config for migrations
+        - name: FLEET_MYSQL_ADDRESS
+          value: "mysql.fleet-sandbox.svc.cluster.local:3306"
+        - name: FLEET_MYSQL_DATABASE
+          value: "fleet"
+        - name: FLEET_MYSQL_USERNAME
+          value: "fleet"
+        - name: FLEET_MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fleet-sandbox-secrets
+              key: mysql-password
       containers:
       - name: fleet
         image: fleetdm/fleet:v4.80.0
