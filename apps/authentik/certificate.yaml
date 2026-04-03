@@ -5,6 +5,8 @@ metadata:
   namespace: authentik
 spec:
   secretName: authentik-tls
+  duration: 2160h     # 90 days
+  renewBefore: 720h   # renew 30 days before expiry
   dnsNames:
   - auth.kitzy.net
   - authentik-server.authentik.svc.cluster.local
