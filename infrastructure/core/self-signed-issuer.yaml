@@ -5,24 +5,12 @@ metadata:
 spec:
   selfSigned: {}
 ---
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: selfsigned-ca
-  namespace: cert-manager
-spec:
-  isCA: true
-  commonName: homelab-k3s-ca
-  secretName: selfsigned-ca-secret
-  duration: 87600h    # 10 years
-  renewBefore: 720h   # renew 30 days before expiry
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  issuerRef:
-    name: selfsigned-issuer
-    kind: ClusterIssuer
-    group: cert-manager.io
+# NOTE: The selfsigned-ca Certificate resource was removed because the
+# SelfSigned issuer has a known bug that caps cert duration at 90 days
+# (https://github.com/cert-manager/cert-manager/issues/2637).
+# The CA cert is now managed manually via openssl with a 10-year validity
+# and stored directly in the selfsigned-ca-secret Secret.
+# Current CA expires: 2036-03-31
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
