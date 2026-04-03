@@ -7,6 +7,8 @@ spec:
   secretName: hello-world-tls
   duration: 2160h     # 90 days
   renewBefore: 720h   # renew 30 days before expiry
+  privateKey:
+    rotationPolicy: Always
   dnsNames:
   - hello.kitzy.net
   - hello-world.hello-world.svc.cluster.local

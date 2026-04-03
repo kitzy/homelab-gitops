@@ -21,6 +21,8 @@ spec:
   issuerRef:
     name: ca-issuer
     kind: ClusterIssuer
+  privateKey:
+    rotationPolicy: Always
   commonName: fleet.fleet-sandbox.svc.cluster.local
   dnsNames:
   - fleet.fleet-sandbox.svc.cluster.local
