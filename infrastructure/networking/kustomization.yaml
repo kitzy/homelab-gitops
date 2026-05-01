@@ -4,4 +4,3 @@ resources:
   - cloudflare
   - tailscale
   - metallb
-  - nginx-ingress

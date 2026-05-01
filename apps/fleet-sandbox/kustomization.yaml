@@ -10,3 +10,4 @@ resources:
   - backup-storage-pvc.yaml
   - backup-cronjob.yaml
   - ingress.yaml
+  - traefik-config.yaml
