@@ -143,6 +143,8 @@ spec:
           value: "yes"
 
         # Osquery settings
+        - name: FLEET_OSQUERY_HOST_IDENTIFIER
+          value: "uuid"
         - name: FLEET_OSQUERY_LABEL_UPDATE_INTERVAL
           value: "1m"
         - name: FLEET_SESSION_DURATION
