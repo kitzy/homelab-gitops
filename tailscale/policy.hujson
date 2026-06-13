@@ -1,60 +1,91 @@
-// Tailnet policy — least-privilege.
+// Tailnet policy — least-privilege, role-tagged.
 //
-// Replaces the default "allow all" template with explicit grants for the only
-// flows this tailnet actually uses (see tailscale/README.md → "Tags currently
-// in use"):
-//   - CI (tag:ci)            → Kubernetes API on 6443
-//   - K8s proxies (tag:k8s)  → control-plane nodes on 6443 (API LB back-end)
-//   - You (autogroup:member) → exposed web UIs + kubectl, and your own devices
+// Access model:
+//   - Infra devices carry role tags (tag:server / tag:mgmt / tag:router) and are
+//     owned by those tags, NOT by a user — so they're reachable only via the
+//     explicit grants below, not blanket autogroup:self.
+//   - Personal devices (laptop, phone) stay untagged under your account =
+//     autogroup:member.
+//   - The Kubernetes operator/proxies (tag:k8s*) and CI (tag:ci) are unchanged.
 //
-// Everything not granted below is denied. Tailscale SSH and tag ownership are
-// unchanged from the live tailnet.
+// Device -> tag mapping (apply with `tailscale up --advertise-tags=...`; see
+// tailscale/README.md):
+//   tag:server  -> pve1, pve2, homelab-01, nova
+//   tag:mgmt    -> glkvm   (out-of-band KVM)
+//   tag:router  -> somerset-pi, woolston-gateway  (subnet routers + exit nodes)
+//
+// Everything not granted below is denied.
 {
-	// Static user groups. None needed yet — this is a single-admin tailnet, so
-	// access is expressed via autogroup:member / autogroup:admin. Add a group
-	// here (e.g. "group:family") if you ever share specific services.
-	// "groups": {
-	//   "group:family": ["someone@example.com"],
-	// },
+	// Static user groups — none needed yet (single-admin tailnet). Add e.g.
+	// "group:family" here if you ever share specific services with other users.
 
-	// Grants govern network access. Order doesn't matter; grants are additive
-	// and the tailnet is default-deny once any grant exists.
 	"grants": [
-		// --- CI → Kubernetes API ------------------------------------------------
-		// The Flux reconcile workflow (.github/workflows/flux-reconcile.yaml)
-		// joins as an ephemeral tag:ci node and talks to the cluster only through
-		// the Tailscale-exposed API server (k8s-api LoadBalancer, port 6443).
+		// ---- Infrastructure management ----------------------------------------
+		// You manage the hypervisors / servers over SSH and the Proxmox web UI.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:server"],
+			"ip":  ["tcp:22", "tcp:8006"],
+		},
+		// Out-of-band KVM (glkvm): SSH + its web console.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:mgmt"],
+			"ip":  ["tcp:22", "tcp:80", "tcp:443"],
+		},
+		// Subnet routers / exit nodes: SSH for admin (route + internet access to
+		// what they advertise is granted separately below).
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:router"],
+			"ip":  ["tcp:22"],
+		},
+
+		// ---- Subnet routes & exit nodes ---------------------------------------
+		// Reach the physical LANs advertised by the routers. 10.253.20.0/24 is
+		// also where the cluster's MetalLB/Traefik LoadBalancer IPs live.
+		{
+			"src": ["autogroup:member"],
+			"dst": [
+				"10.253.1.0/24",   // woolston-gateway
+				"10.253.20.0/24",  // woolston-gateway (cluster LAN / MetalLB)
+				"10.253.30.0/24",  // woolston-gateway
+				"10.54.1.0/24",    // somerset-pi
+			],
+			"ip": ["*"],
+		},
+		// Use the routers as exit nodes for internet egress.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["autogroup:internet"],
+			"ip":  ["*"],
+		},
+
+		// ---- Kubernetes -------------------------------------------------------
+		// CI (Flux reconcile) reaches only the K8s API.
 		{
 			"src": ["tag:ci"],
 			"dst": ["tag:k8s"],
 			"ip":  ["tcp:6443"],
 		},
-
-		// --- K8s API proxy → control-plane nodes --------------------------------
-		// The Tailscale LoadBalancer that fronts the API server
-		// (kubernetes/infrastructure/networking/tailscale/k8s-api-service.yaml)
-		// forwards to the three control-plane nodes' tailnet IPs on 6443. Those
-		// IPs are the Endpoints hardcoded in that manifest. If a control-plane
-		// node is replaced and gets a new Tailscale IP, update both files.
+		// The API-server LoadBalancer proxy forwards to the control-plane nodes'
+		// tailnet IPs on 6443 (Endpoints hardcoded in k8s-api-service.yaml).
+		// Referenced by IP so it's independent of those nodes' tags/ownership.
 		{
 			"src": ["tag:k8s"],
 			"dst": ["100.115.235.1", "100.106.127.19", "100.77.140.69"],
 			"ip":  ["tcp:6443"],
 		},
-
-		// --- You → cluster services --------------------------------------------
-		// Members reach the Tailscale-ingress web UIs (hello, portainer, scanopy
-		// all serve HTTPS on 443 on the tailnet) and the API server for kubectl.
+		// You reach the Tailscale-ingress web UIs (443) and the API (6443).
 		{
 			"src": ["autogroup:member"],
 			"dst": ["tag:k8s"],
 			"ip":  ["tcp:443", "tcp:6443"],
 		},
 
-		// --- You → your own devices --------------------------------------------
-		// Preserves connectivity among devices you personally own (laptop, phone,
-		// etc.). Tagged devices are NOT covered by autogroup:self, so this does
-		// not re-open access to the cluster.
+		// ---- Personal devices -------------------------------------------------
+		// Your own untagged devices keep full connectivity to each other. Tagged
+		// infra is NOT covered by autogroup:self, so this doesn't re-open it.
 		{
 			"src": ["autogroup:member"],
 			"dst": ["autogroup:self"],
@@ -62,8 +93,22 @@
 		},
 	],
 
-	// Tailscale SSH — unchanged. Members may SSH into their own devices in
-	// "check" mode (re-auth required); does not grant SSH to tagged nodes.
+	// Auto-approve the routers' advertised routes and exit-node capability so
+	// re-authing them with tag:router doesn't drop approval (which would
+	// otherwise need a manual re-approve in the console on every key change).
+	"autoApprovers": {
+		"routes": {
+			"10.253.1.0/24":  ["tag:router"],
+			"10.253.20.0/24": ["tag:router"],
+			"10.253.30.0/24": ["tag:router"],
+			"10.54.1.0/24":   ["tag:router"],
+		},
+		"exitNode": ["tag:router"],
+	},
+
+	// Tailscale SSH (check mode = periodic re-auth). Covers your own devices and
+	// the tagged infra, so SSH access survives the move to tags whether you use
+	// Tailscale SSH or plain sshd (the tcp:22 grants above cover plain sshd).
 	"ssh": [
 		{
 			"action": "check",
@@ -71,25 +116,31 @@
 			"dst":    ["autogroup:self"],
 			"users":  ["autogroup:nonroot", "root"],
 		},
+		{
+			"action": "check",
+			"src":    ["autogroup:member"],
+			"dst":    ["tag:server", "tag:mgmt", "tag:router"],
+			"users":  ["autogroup:nonroot", "root"],
+		},
 	],
 
-	// Tag ownership — unchanged from the live tailnet. The operator OAuth client
-	// owns tag:k8s-operator and assigns tag:k8s to the proxy devices it creates;
-	// admins own tag:ci.
 	"tagOwners": {
 		"tag:k8s-operator": [],
 		"tag:k8s":          ["tag:k8s-operator"],
 		"tag:ci":           ["autogroup:admin"],
+		"tag:server":       ["autogroup:admin"],
+		"tag:mgmt":         ["autogroup:admin"],
+		"tag:router":       ["autogroup:admin"],
 	},
 
-	// Regression guard: asserts CI keeps API access so a future edit can't
-	// silently break Flux reconciliation, and that CI is NOT granted the web
-	// UI port. Tests run on every save/apply.
+	// Regression guard. Asserts CI keeps API access and stays contained — it
+	// must not reach the k8s web port, server SSH, or the KVM console. Runs on
+	// every save/apply.
 	"tests": [
 		{
 			"src":    "tag:ci",
 			"accept": ["tag:k8s:6443"],
-			"deny":   ["tag:k8s:443"],
+			"deny":   ["tag:k8s:443", "tag:server:22", "tag:mgmt:443"],
 		},
 	],
 }
