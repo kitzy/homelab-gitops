@@ -1,6 +1,7 @@
 provider "tailscale" {
-  # Authentication is supplied as sensitive environment variables on the HCP
-  # workspace; the provider reads them automatically:
+  # Authentication comes from OAuth client credentials, which the provider reads
+  # automatically from these environment variables. CI sets them on the job from
+  # 1Password (see .github/workflows/tailscale-terraform.yaml):
   #   TAILSCALE_OAUTH_CLIENT_ID
   #   TAILSCALE_OAUTH_CLIENT_SECRET
   #

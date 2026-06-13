@@ -4,8 +4,10 @@ This directory is a **Terraform root module** that manages the Tailscale tailnet
 code — currently the tailnet **policy file** (ACLs, grants, tags, SSH), with DNS,
 auth keys, and device authorization planned (see [Roadmap](#roadmap)).
 
-State and runs are handled by **HCP Terraform** (Terraform Cloud), VCS-driven: opening
-a PR produces a speculative `plan`, merging to `main` runs `apply`.
+It follows the same pattern as [`kitzy/dns`](https://github.com/kitzy/dns): **HCP
+Terraform holds the remote state** (local execution mode), and **GitHub Actions** runs
+`plan` on PRs and `apply` on merge. Secrets come from 1Password, matching the repo's
+existing [`flux-reconcile.yaml`](../.github/workflows/flux-reconcile.yaml).
 
 > **Scope:** this manages tailnet-wide configuration. It is **separate** from the
 > in-cluster [Tailscale Kubernetes Operator](../kubernetes/infrastructure/networking/tailscale/),
@@ -15,10 +17,12 @@ a PR produces a speculative `plan`, merging to `main` runs `apply`.
 
 | File | Purpose |
 |------|---------|
-| [`terraform.tf`](terraform.tf) | Terraform settings: HCP `cloud` backend + provider versions |
-| [`providers.tf`](providers.tf) | Tailscale provider (OAuth via workspace env vars) |
+| [`terraform.tf`](terraform.tf) | HCP `cloud` backend (org `kitzy_net`, workspace `homelab-tailscale`) + provider versions |
+| [`providers.tf`](providers.tf) | Tailscale provider (OAuth via env vars) |
 | [`acl.tf`](acl.tf) | `tailscale_acl` resource — applies `policy.hujson` |
 | [`policy.hujson`](policy.hujson) | The tailnet policy (HuJSON). Source of truth, applied verbatim. |
+
+The workflow lives at [`.github/workflows/tailscale-terraform.yaml`](../.github/workflows/tailscale-terraform.yaml).
 
 ## How it works
 
@@ -26,32 +30,29 @@ a PR produces a speculative `plan`, merging to `main` runs `apply`.
   Edit tailscale/*.tf or policy.hujson
             │
    ┌────────┴─────────┐
-   │   Pull request   │ ──►  HCP runs a speculative `terraform plan`
-   │                  │       (posted as a check on the PR; nothing applied)
+   │   Pull request   │ ──►  GitHub Actions: fmt + validate + `terraform plan`
+   │                  │       (state read from HCP; nothing applied)
    └────────┬─────────┘
             │ merge to main
             ▼
-   HCP runs `terraform apply`  ──►  Tailscale API  ──►  live tailnet
+   GitHub Actions: `terraform apply`  ──►  Tailscale API  ──►  live tailnet
+                         │
+                         └─ state stored in HCP Terraform (kitzy_net / homelab-tailscale)
 ```
 
-Because `policy.hujson` was seeded **verbatim** from the live tailnet, the first apply
-just brings the resource under Terraform management and pushes an identical policy — a
-no-op against the tailnet.
+HCP runs in **local execution mode**: the GitHub Actions runner executes Terraform and
+only uses HCP to store/lock state. Because `policy.hujson` was seeded **verbatim** from
+the live tailnet, the first apply just brings the resource under management and pushes an
+identical policy — a no-op against the tailnet.
 
 ## One-time setup
 
-### 1. Create the HCP Terraform workspace
+### 1. Create the HCP workspace (state only)
 
-1. Sign in to [HCP Terraform](https://app.terraform.io/) and note your **organization
-   name** — then set it as `organization` in [`terraform.tf`](terraform.tf) (currently
-   `kitzy`).
-2. Create a **VCS-driven** workspace named **`homelab-tailscale`**, connected to the
-   `kitzy/homelab-gitops` GitHub repo.
-3. In the workspace **Settings → General**:
-   - **Terraform Working Directory:** `tailscale`
-   - **Apply Method:** Auto apply (so merges to `main` apply automatically)
-4. In **Settings → Version Control**, set **trigger patterns** to `tailscale/**` so changes
-   elsewhere in the monorepo don't queue runs here.
+1. In [HCP Terraform](https://app.terraform.io/), under organization **`kitzy_net`**,
+   create a workspace named **`homelab-tailscale`**.
+2. Choose the **CLI-driven** workflow (no VCS connection — GitHub Actions drives runs).
+3. In **Settings → General**, set **Execution Mode: Local** (same as the `dns` workspace).
 
 ### 2. Create a Tailscale OAuth client
 
@@ -61,27 +62,28 @@ with **write** scope for:
 - `acl` — the policy file (required now)
 - `dns` — DNS settings (for the planned DNS management)
 
-Save the **Client ID** and **Client Secret**. (Broader scopes — `auth_keys`, `devices` —
-get added when we add those resources; they require a tag on the client.)
+(Broader scopes — `auth_keys`, `devices` — get added when we add those resources; they
+require a tag on the client.)
 
-### 3. Add credentials to the workspace
+### 3. Add secrets to 1Password (vault `GitHub`)
 
-In the `homelab-tailscale` workspace → **Variables**, add two **environment variables**,
-both marked **Sensitive**:
+The workflow reads these via the existing `OP_SERVICE_ACCOUNT_TOKEN` GitHub secret — no
+new GitHub secrets needed:
 
-| Variable | Value |
-|----------|-------|
-| `TAILSCALE_OAUTH_CLIENT_ID` | the OAuth Client ID |
-| `TAILSCALE_OAUTH_CLIENT_SECRET` | the OAuth Client Secret |
+| 1Password reference | Value |
+|---------------------|-------|
+| `op://GitHub/Terraform Cloud/credential` | HCP Terraform API token (a **user/team API token** from HCP → Account settings → Tokens) |
+| `op://GitHub/Tailscale ACL/OAUTH_CLIENT_ID` | Tailscale OAuth Client ID |
+| `op://GitHub/Tailscale ACL/OAUTH_SECRET` | Tailscale OAuth Client Secret |
 
-The provider reads these automatically — no Terraform variables or GitHub secrets needed.
-(Recommended: keep a copy in the 1Password `GitHub` vault as the system of record.)
+Create the items/fields to match those references (item `Terraform Cloud` with field
+`credential`, item `Tailscale ACL` with fields `OAUTH_CLIENT_ID` / `OAUTH_SECRET`).
 
 ## Editing the policy or config
 
 1. Edit [`policy.hujson`](policy.hujson) (or the `.tf` files) on a branch.
-2. Open a PR — HCP posts a speculative `plan` as a check. Review the diff.
-3. Merge to `main` — HCP applies it.
+2. Open a PR — the **plan** job posts the diff. Review it.
+3. Merge to `main` — the **apply** job pushes it live.
 
 ### Tags currently in use
 
@@ -102,10 +104,11 @@ discipline as the ACL), then added as its own resource/PR:
 
 ## Safety notes
 
-- `policy.hujson` matches the live tailnet, so the first apply is a no-op.
-- `overwrite_existing_content = true` lets Terraform manage the policy without a prior
-  `terraform import`; it is safe here precisely because the committed policy is identical
-  to what's live.
+- `policy.hujson` matches the live tailnet, so the first apply is a no-op (verified
+  byte-for-byte against the live policy via the API before enabling automation).
+- `overwrite_existing_content = true` (in `acl.tf`) lets Terraform manage the policy
+  without a prior `terraform import`; it is safe here precisely because the committed
+  policy is identical to what's live.
 - The OAuth client is least-privilege (only the scopes listed above).
 - `apply` runs on merge — treat `main` as production and review the PR plan every time.
 
@@ -114,4 +117,4 @@ discipline as the ACL), then added as its own resource/PR:
 - [Tailscale Terraform provider](https://registry.terraform.io/providers/tailscale/tailscale/latest/docs)
 - [`tailscale_acl` resource](https://registry.terraform.io/providers/tailscale/tailscale/latest/docs/resources/acl)
 - [Tailnet policy file syntax](https://tailscale.com/kb/1337/policy-syntax)
-- [HCP Terraform VCS-driven runs](https://developer.hashicorp.com/terraform/cloud-docs/run/ui)
+- [`kitzy/dns`](https://github.com/kitzy/dns) — the sibling repo this pattern mirrors

@@ -1,15 +1,12 @@
 terraform {
-  required_version = ">= 1.9"
+  required_version = ">= 1.0"
 
-  # State + runs are managed by HCP Terraform (Terraform Cloud), VCS-driven.
-  # The workspace below must exist and be connected to this repo with:
-  #   - Working Directory: tailscale
-  #   - VCS trigger paths:  tailscale/**
-  # so PRs get a speculative plan and merges to main apply. See README.md.
-  #
-  # NOTE: set `organization` to your actual HCP organization name.
+  # HCP Terraform (Terraform Cloud) holds remote state only. The workspace runs
+  # in *local execution* mode (matching kitzy/dns) — GitHub Actions is the
+  # runner; HCP just stores the state file. The workspace must exist and use
+  # Execution Mode: Local, with no VCS connection. See README.md.
   cloud {
-    organization = "kitzy"
+    organization = "kitzy_net"
 
     workspaces {
       name = "homelab-tailscale"

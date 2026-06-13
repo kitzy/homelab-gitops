@@ -1,0 +1,71 @@
+name: Tailscale Terraform
+
+# GitOps for the Tailscale tailnet (tailscale/ Terraform root).
+#   - Pull requests touching tailscale/** run fmt/validate/plan (no changes).
+#   - Push to main touching tailscale/** runs apply.
+# HCP Terraform holds remote state (local execution); secrets come from 1Password.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'tailscale/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tailscale/**'
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Plan / Apply
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tailscale
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        id: op-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          TF_API_TOKEN: op://GitHub/Terraform Cloud/credential
+          TS_OAUTH_CLIENT_ID: op://GitHub/Tailscale ACL/OAUTH_CLIENT_ID
+          TS_OAUTH_SECRET: op://GitHub/Tailscale ACL/OAUTH_SECRET
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ steps.op-secrets.outputs.TF_API_TOKEN }}
+
+      - name: Terraform fmt
+        run: terraform fmt -check
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        if: github.event_name == 'pull_request'
+        env:
+          TAILSCALE_OAUTH_CLIENT_ID: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
+          TAILSCALE_OAUTH_CLIENT_SECRET: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
+        run: terraform plan -no-color -input=false
+
+      - name: Terraform apply
+        if: github.event_name == 'push'
+        env:
+          TAILSCALE_OAUTH_CLIENT_ID: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
+          TAILSCALE_OAUTH_CLIENT_SECRET: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
+        run: terraform apply -auto-approve -input=false
