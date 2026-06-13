@@ -80,7 +80,10 @@ homelab-gitops/
 │   ├── apps/                    # Application deployments
 │   │   ├── hello-world/         # Test application (validates stack)
 │   │   ├── fleet/               # FleetDM endpoint management
+│   │   ├── fleet-sandbox/       # Fleet sandbox (Traefik ingress + Let's Encrypt)
 │   │   ├── scanopy/             # Network discovery platform
+│   │   ├── authentik/           # Identity provider / SSO
+│   │   ├── portainer/           # Container management UI
 │   │   └── kustomization.yaml   # Apps root kustomization
 │   └── clusters/production/     # Cluster-specific Flux configuration
 │       ├── apps.yaml            # Flux Kustomization → kubernetes/apps
@@ -155,7 +158,10 @@ homelab-gitops/
    resources:
      - hello-world
      - fleet
+     - fleet-sandbox
      - scanopy
+     - authentik
+     - portainer
      - my-app              # Add new app here
    ```
 
