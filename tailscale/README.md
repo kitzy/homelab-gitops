@@ -21,6 +21,8 @@ existing [`flux-reconcile.yaml`](../.github/workflows/flux-reconcile.yaml).
 | [`providers.tf`](providers.tf) | Tailscale provider (OAuth via env vars) |
 | [`acl.tf`](acl.tf) | `tailscale_acl` resource — applies `policy.hujson` |
 | [`dns.tf`](dns.tf) | `tailscale_dns_preferences` — MagicDNS (the only DNS setting currently in use) |
+| [`tailnet-settings.tf`](tailnet-settings.tf) | `tailscale_tailnet_settings` — tailnet-wide admin settings; locks ACL editing to GitOps |
+| [`contacts.tf`](contacts.tf) | `tailscale_contacts` — account/support/security contact emails |
 | [`policy.hujson`](policy.hujson) | The tailnet policy (HuJSON). Source of truth, applied verbatim. |
 
 The workflow lives at [`.github/workflows/tailscale-terraform.yaml`](../.github/workflows/tailscale-terraform.yaml).
@@ -99,6 +101,8 @@ Create the items/fields to match those references (item `Terraform Cloud` with f
 Each surface is captured from the live tailnet first (same "verbatim, then manage"
 discipline as the ACL), then added as its own resource/PR:
 
+- [x] **Tailnet settings** (`tailscale_tailnet_settings`) — incl. locking ACL editing to GitOps
+- [x] **Contacts** (`tailscale_contacts`)
 - [x] **DNS — MagicDNS** (`tailscale_dns_preferences`) — managed in `dns.tf`
 - [ ] **DNS — nameservers / search paths / split-DNS** — currently empty on the tailnet;
       add `tailscale_dns_nameservers` / `tailscale_dns_search_paths` /
@@ -115,6 +119,11 @@ discipline as the ACL), then added as its own resource/PR:
   policy is identical to what's live.
 - The OAuth client is least-privilege (only the scopes listed above).
 - `apply` runs on merge — treat `main` as production and review the PR plan every time.
+- **ACL editing is locked to GitOps** (`acls_externally_managed_on = true` in
+  `tailnet-settings.tf`): the admin-console policy editor is read-only, so all ACL
+  changes must go through this repo. If CI is ever broken and you need an emergency
+  console hotfix, set that flag back to `false` first (via a PR, or temporarily in the
+  console once unlocked).
 
 ## References
 
