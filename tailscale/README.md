@@ -20,6 +20,7 @@ existing [`flux-reconcile.yaml`](../.github/workflows/flux-reconcile.yaml).
 | [`terraform.tf`](terraform.tf) | HCP `cloud` backend (org `kitzy_net`, workspace `homelab-tailscale`) + provider versions |
 | [`providers.tf`](providers.tf) | Tailscale provider (OAuth via env vars) |
 | [`acl.tf`](acl.tf) | `tailscale_acl` resource — applies `policy.hujson` |
+| [`dns.tf`](dns.tf) | `tailscale_dns_preferences` — MagicDNS (the only DNS setting currently in use) |
 | [`policy.hujson`](policy.hujson) | The tailnet policy (HuJSON). Source of truth, applied verbatim. |
 
 The workflow lives at [`.github/workflows/tailscale-terraform.yaml`](../.github/workflows/tailscale-terraform.yaml).
@@ -98,7 +99,10 @@ Create the items/fields to match those references (item `Terraform Cloud` with f
 Each surface is captured from the live tailnet first (same "verbatim, then manage"
 discipline as the ACL), then added as its own resource/PR:
 
-- [ ] **DNS** — `tailscale_dns_nameservers`, `tailscale_dns_preferences`, `tailscale_dns_search_paths`
+- [x] **DNS — MagicDNS** (`tailscale_dns_preferences`) — managed in `dns.tf`
+- [ ] **DNS — nameservers / search paths / split-DNS** — currently empty on the tailnet;
+      add `tailscale_dns_nameservers` / `tailscale_dns_search_paths` /
+      `tailscale_dns_split_nameservers` when a resolver or internal domains are configured
 - [ ] **Auth keys** — `tailscale_tailnet_key` (e.g. the operator/CI bootstrap keys)
 - [ ] **Device authorization / posture** as needed
 
