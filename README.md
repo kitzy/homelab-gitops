@@ -10,6 +10,7 @@ This repository is the single source of truth for the homelab. Each top-level di
 |-----------|--------|--------|
 | [`kubernetes/`](kubernetes/) | K3s cluster (apps + infrastructure) synced by Flux CD | Active |
 | [`tailscale/`](tailscale/) | Tailnet config (ACLs, DNS, keys) via Terraform on HCP | Active |
+| [`dns/`](dns/) | Public DNS (Route53 + Cloudflare zones) via Terraform on HCP | Active |
 | `proxmox/` | Proxmox VMs as code (Terraform) | Planned |
 | `docker/` | Standalone Docker container configs | Planned |
 

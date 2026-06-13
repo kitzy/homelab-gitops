@@ -1,0 +1,68 @@
+name: DNS Sync
+
+# Apply DNS (Route53 + Cloudflare) on push to main touching dns/**.
+# HCP Terraform holds remote state (workspace "dns", local execution); secrets
+# come from 1Password. Mirrors the tailscale/flux secret pattern.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'dns/**'
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Apply
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate zone configuration
+        run: python3 dns/scripts/validate_zones.py
+
+      - name: Load secrets from 1Password
+        id: op-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          TF_API_TOKEN: op://GitHub/Terraform Cloud/credential
+          AWS_ACCESS_KEY_ID: op://GitHub/AWS Route53/access_key_id
+          AWS_SECRET_ACCESS_KEY: op://GitHub/AWS Route53/secret_access_key
+          AWS_REGION: op://GitHub/AWS Route53/region
+          CLOUDFLARE_API_TOKEN: op://GitHub/Cloudflare/api_token
+          CLOUDFLARE_ACCOUNT_ID: op://GitHub/Cloudflare/account_id
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ steps.op-secrets.outputs.TF_API_TOKEN }}
+
+      - name: Terraform init
+        working-directory: dns/terraform
+        run: terraform init -input=false
+
+      - name: Terraform apply
+        working-directory: dns/terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.op-secrets.outputs.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.op-secrets.outputs.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ steps.op-secrets.outputs.AWS_REGION }}
+          TF_VAR_AWS_REGION: ${{ steps.op-secrets.outputs.AWS_REGION }}
+          TF_VAR_CLOUDFLARE_API_TOKEN: ${{ steps.op-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_CLOUDFLARE_ACCOUNT_ID: ${{ steps.op-secrets.outputs.CLOUDFLARE_ACCOUNT_ID }}
+        run: terraform apply -auto-approve -input=false
