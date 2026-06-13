@@ -40,6 +40,26 @@ records:
     type: A
     values:
       - "100.34.107.85"
+  - name: "nas"
+    ttl: 300
+    type: A
+    values:
+      - "100.34.107.83"
+  - name: "cctv"
+    ttl: 300
+    type: CNAME
+    values:
+      - "nas.kitzy.net"
+  - name: "files"
+    ttl: 300
+    type: CNAME
+    values:
+      - "nas.kitzy.net"
+  - name: "drive"
+    ttl: 300
+    type: CNAME
+    values:
+      - "nas.kitzy.net"
   - name: "kitzy.net"
     ttl: 300
     type: TXT
