@@ -39,6 +39,9 @@ jobs:
     name: Terraform plan
     needs: lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # post the Terraform plan as a PR comment
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -75,6 +78,8 @@ jobs:
         run: terraform validate
 
       - name: Terraform plan
+        id: plan
+        continue-on-error: true # comment the result on the PR before failing on error
         working-directory: dns/terraform
         env:
           AWS_ACCESS_KEY_ID: ${{ steps.op-secrets.outputs.AWS_ACCESS_KEY_ID }}
@@ -84,3 +89,60 @@ jobs:
           TF_VAR_CLOUDFLARE_API_TOKEN: ${{ steps.op-secrets.outputs.CLOUDFLARE_API_TOKEN }}
           TF_VAR_CLOUDFLARE_ACCOUNT_ID: ${{ steps.op-secrets.outputs.CLOUDFLARE_ACCOUNT_ID }}
         run: terraform plan -no-color -input=false
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        env:
+          PLAN_STDOUT: ${{ steps.plan.outputs.stdout }}
+          PLAN_STDERR: ${{ steps.plan.outputs.stderr }}
+        with:
+          script: |
+            const marker = '<!-- dns-terraform-plan -->';
+            const stdout = process.env.PLAN_STDOUT || '';
+            const stderr = process.env.PLAN_STDERR || '';
+            const raw = (stderr ? stdout + '\n' + stderr : stdout).trim() || '(no output)';
+            const max = 60000;
+            const plan = raw.length > max
+              ? raw.slice(0, max) + '\n\n... output truncated; see the workflow run logs for the full plan.'
+              : raw;
+            const ok = '${{ steps.plan.outputs.exitcode }}' === '0';
+            const body = [
+              marker,
+              `## DNS Terraform plan ${ok ? '📋' : '❌'}`,
+              '',
+              '<details><summary>Show plan</summary>',
+              '',
+              '```terraform',
+              plan,
+              '```',
+              '',
+              '</details>',
+              '',
+              '*Merging to `main` runs `terraform apply`.*',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan errored
+        if: steps.plan.outputs.exitcode != '0'
+        run: exit 1

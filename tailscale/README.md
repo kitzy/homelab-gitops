@@ -87,7 +87,8 @@ Create the items/fields to match those references (item `Terraform Cloud` with f
 ## Editing the policy or config
 
 1. Edit [`policy.hujson`](policy.hujson) (or the `.tf` files) on a branch.
-2. Open a PR — the **plan** job posts the diff. Review it.
+2. Open a PR — the **plan** job posts the `terraform plan` output as a PR comment
+   (updated in place on each push). Review it.
 3. Merge to `main` — the **apply** job pushes it live.
 
 ### Tags currently in use
