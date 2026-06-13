@@ -23,6 +23,7 @@ existing [`flux-reconcile.yaml`](../.github/workflows/flux-reconcile.yaml).
 | [`dns.tf`](dns.tf) | `tailscale_dns_preferences` — MagicDNS (the only DNS setting currently in use) |
 | [`tailnet-settings.tf`](tailnet-settings.tf) | `tailscale_tailnet_settings` — tailnet-wide admin settings; locks ACL editing to GitOps |
 | [`contacts.tf`](contacts.tf) | `tailscale_contacts` — account/support/security contact emails |
+| [`variables.tf`](variables.tf) | Input variables (e.g. `contact_email`, sourced from 1Password — not committed) |
 | [`policy.hujson`](policy.hujson) | The tailnet policy (HuJSON). Source of truth, applied verbatim. |
 
 The workflow lives at [`.github/workflows/tailscale-terraform.yaml`](../.github/workflows/tailscale-terraform.yaml).
@@ -78,6 +79,7 @@ new GitHub secrets needed:
 | `op://GitHub/Terraform Cloud/credential` | HCP Terraform API token (a **user/team API token** from HCP → Account settings → Tokens) |
 | `op://GitHub/Tailscale ACL/OAUTH_CLIENT_ID` | Tailscale OAuth Client ID |
 | `op://GitHub/Tailscale ACL/OAUTH_SECRET` | Tailscale OAuth Client Secret |
+| `op://GitHub/Tailscale ACL/contact_email` | Tailnet contact email — passed to Terraform as `TF_VAR_contact_email` (kept out of the repo) |
 
 Create the items/fields to match those references (item `Terraform Cloud` with field
 `credential`, item `Tailscale ACL` with fields `OAUTH_CLIENT_ID` / `OAUTH_SECRET`).
