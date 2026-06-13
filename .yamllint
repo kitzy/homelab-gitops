@@ -10,3 +10,4 @@ rules:
 
 ignore: |
   kubernetes/clusters/production/flux-system/gotk-components.yaml
+  dns/

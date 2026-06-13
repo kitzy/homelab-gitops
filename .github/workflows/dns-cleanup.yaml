@@ -1,0 +1,80 @@
+name: DNS Cleanup stray records
+
+# Delete records that exist in Route53/Cloudflare but are not defined in dns_zones/.
+# Scheduled daily; manual runs default to dry-run. Secrets from 1Password.
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (show what would be deleted without deleting)'
+        required: false
+        type: boolean
+        default: true
+      debug:
+        description: 'Enable debug output'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install boto3 pyyaml requests
+
+      - name: Load secrets from 1Password
+        id: op-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AWS_ACCESS_KEY_ID: op://GitHub/AWS Route53/access_key_id
+          AWS_SECRET_ACCESS_KEY: op://GitHub/AWS Route53/secret_access_key
+          AWS_REGION: op://GitHub/AWS Route53/region
+          CLOUDFLARE_API_TOKEN: op://GitHub/Cloudflare/api_token
+
+      - name: Set run mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+            echo "debug=${{ github.event.inputs.debug }}" >> $GITHUB_OUTPUT
+          else
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+            echo "debug=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cleanup Route53
+        if: steps.mode.outputs.dry_run == 'false'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.op-secrets.outputs.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.op-secrets.outputs.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ steps.op-secrets.outputs.AWS_REGION }}
+        run: python3 dns/scripts/cleanup_route53.py
+
+      - name: Cleanup Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.op-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ "${{ steps.mode.outputs.dry_run }}" = "true" ]; then
+            echo "Running in DRY-RUN mode"
+            python3 dns/scripts/cleanup_cloudflare.py --dry-run ${{ steps.mode.outputs.debug == 'true' && '--debug' || '' }}
+          else
+            python3 dns/scripts/cleanup_cloudflare.py ${{ steps.mode.outputs.debug == 'true' && '--debug' || '' }}
+          fi

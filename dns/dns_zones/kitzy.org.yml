@@ -1,0 +1,41 @@
+zone_name: "kitzy.org"
+providers:
+  - route53
+  - cloudflare
+records:
+  - name: "kitzy.org"
+    type: NS
+    ttl: 172800
+    values:
+      - "achiel.ns.cloudflare.com"
+      - "ullis.ns.cloudflare.com"
+  - name: "*"
+    ttl: 300
+    type: A
+    values:
+      - "100.34.107.84"
+  - name: "kitzy.org"
+    ttl: 300
+    type: A
+    values:
+      - "100.34.107.84"
+  - name: "kitzy.org"
+    type: "MX"
+    ttl: 300
+    mx_records:
+      - priority: 1
+        value: "aspmx.l.google.com"
+      - priority: 5
+        value: "alt1.aspmx.l.google.com"
+      - priority: 5
+        value: "alt2.aspmx.l.google.com"
+      - priority: 10
+        value: "alt3.aspmx.l.google.com"
+      - priority: 10
+        value: "alt4.aspmx.l.google.com"
+  - name: "kitzy.org"
+    type: "TXT"
+    ttl: 300
+    values:
+      - "google-site-verification=9yl20ZqS6vDq-MrXFyOanm4vp0UurINP66unuNk3Tvo"
+      - "keybase-site-verification=MseDUEf46cWFTUbrC7uwO2c4Soy3361v_oGzc0EFM6g"

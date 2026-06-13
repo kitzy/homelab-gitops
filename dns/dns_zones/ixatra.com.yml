@@ -1,0 +1,27 @@
+zone_name: "ixatra.com"
+providers:
+  - route53
+  - cloudflare
+records:
+  - name: "ixatra.com"
+    type: NS
+    ttl: 172800
+    values:
+      - "achiel.ns.cloudflare.com"
+      - "ullis.ns.cloudflare.com"
+  - name: "ixatra.com"
+    ttl: 300
+    type: MX
+    mx_records:
+      - priority: 1
+        value: "smtp.google.com"
+  - name: "*"
+    ttl: 300
+    type: A
+    values:
+      - "100.34.107.84"
+  - name: "ixatra.com"
+    ttl: 300
+    type: A
+    values:
+      - "100.34.107.84"
