@@ -1,0 +1,62 @@
+name: Tailscale ACL Sync
+
+# GitOps for the tailnet policy file (tailscale/policy.hujson).
+#   - Pull requests touching tailscale/** run `action: test` (validate only, no changes).
+#   - Push to main touching tailscale/** runs `action: apply` (push the policy to the tailnet).
+# Auth uses a dedicated Tailscale OAuth client (Policy File write scope) stored in 1Password.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'tailscale/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tailscale/**'
+
+permissions:
+  contents: read
+
+jobs:
+  acls:
+    name: Sync Tailnet Policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        id: op-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          TS_OAUTH_CLIENT_ID: op://GitHub/Tailscale ACL/OAUTH_CLIENT_ID
+          TS_OAUTH_SECRET: op://GitHub/Tailscale ACL/OAUTH_SECRET
+
+      # Test on pull requests: validates the policy and runs any ACL tests,
+      # but never modifies the live tailnet.
+      - name: Test policy (pull request)
+        if: github.event_name == 'pull_request'
+        uses: tailscale/gitops-acl-action@v1
+        with:
+          oauth-client-id: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
+          tailnet: "-"
+          policy-file: tailscale/policy.hujson
+          action: test
+
+      # Apply on push to main: tests, then pushes the policy to the tailnet.
+      - name: Apply policy (main)
+        if: github.event_name == 'push'
+        uses: tailscale/gitops-acl-action@v1
+        with:
+          oauth-client-id: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
+          tailnet: "-"
+          policy-file: tailscale/policy.hujson
+          action: apply
