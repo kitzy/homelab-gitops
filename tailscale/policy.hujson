@@ -1,64 +1,70 @@
-// Example/default ACLs for unrestricted connections.
+// Tailnet policy — least-privilege.
+//
+// Replaces the default "allow all" template with explicit grants for the only
+// flows this tailnet actually uses (see tailscale/README.md → "Tags currently
+// in use"):
+//   - CI (tag:ci)            → Kubernetes API on 6443
+//   - K8s proxies (tag:k8s)  → control-plane nodes on 6443 (API LB back-end)
+//   - You (autogroup:member) → exposed web UIs + kubectl, and your own devices
+//
+// Everything not granted below is denied. Tailscale SSH and tag ownership are
+// unchanged from the live tailnet.
 {
-	// Declare static groups of users. Use autogroups for all users or users with a specific role.
+	// Static user groups. None needed yet — this is a single-admin tailnet, so
+	// access is expressed via autogroup:member / autogroup:admin. Add a group
+	// here (e.g. "group:family") if you ever share specific services.
 	// "groups": {
-	//   "group:example": ["alice@example.com", "bob@example.com"],
+	//   "group:family": ["someone@example.com"],
 	// },
 
-	// Define the tags which can be applied to devices and by which users.
-	// "tagOwners": {
-	//   "tag:example": ["autogroup:admin"],
-	// },
-
-	// Define grants that govern access for users, groups, autogroups, tags,
-	// Tailscale IP addresses, and subnet ranges.
+	// Grants govern network access. Order doesn't matter; grants are additive
+	// and the tailnet is default-deny once any grant exists.
 	"grants": [
-		// Allow all connections.
-		// Comment this section out if you want to define specific restrictions.
-		{
-			"src": ["*"],
-			"dst": ["*"],
-			"ip":  ["*"],
-		},
+		// --- CI → Kubernetes API ------------------------------------------------
+		// The Flux reconcile workflow (.github/workflows/flux-reconcile.yaml)
+		// joins as an ephemeral tag:ci node and talks to the cluster only through
+		// the Tailscale-exposed API server (k8s-api LoadBalancer, port 6443).
 		{
 			"src": ["tag:ci"],
 			"dst": ["tag:k8s"],
-			"ip":  ["*"],
+			"ip":  ["tcp:6443"],
 		},
 
-		// Allow users in "group:example" to access "tag:example", but only from
-		// devices that are running macOS and have enabled Tailscale client auto-updating.
-		// {"src": ["group:example"], "dst": ["tag:example"], "ip": ["*"], "srcPosture":["posture:autoUpdateMac"]},
+		// --- K8s API proxy → control-plane nodes --------------------------------
+		// The Tailscale LoadBalancer that fronts the API server
+		// (kubernetes/infrastructure/networking/tailscale/k8s-api-service.yaml)
+		// forwards to the three control-plane nodes' tailnet IPs on 6443. Those
+		// IPs are the Endpoints hardcoded in that manifest. If a control-plane
+		// node is replaced and gets a new Tailscale IP, update both files.
+		{
+			"src": ["tag:k8s"],
+			"dst": ["100.115.235.1", "100.106.127.19", "100.77.140.69"],
+			"ip":  ["tcp:6443"],
+		},
+
+		// --- You → cluster services --------------------------------------------
+		// Members reach the Tailscale-ingress web UIs (hello, portainer, scanopy
+		// all serve HTTPS on 443 on the tailnet) and the API server for kubectl.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:k8s"],
+			"ip":  ["tcp:443", "tcp:6443"],
+		},
+
+		// --- You → your own devices --------------------------------------------
+		// Preserves connectivity among devices you personally own (laptop, phone,
+		// etc.). Tagged devices are NOT covered by autogroup:self, so this does
+		// not re-open access to the cluster.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["autogroup:self"],
+			"ip":  ["*"],
+		},
 	],
 
-	// Define postures that will be applied to all rules without any specific
-	// srcPosture definition.
-	// "defaultSrcPosture": [
-	//      "posture:anyMac",
-	// ],
-
-	// Define device posture rules requiring devices to meet
-	// certain criteria to access parts of your system.
-	// "postures": {
-	//      // Require devices running macOS, a stable Tailscale
-	//      // version and auto update enabled for Tailscale.
-	//  "posture:autoUpdateMac": [
-	//      "node:os == 'macos'",
-	//      "node:tsReleaseTrack == 'stable'",
-	//      "node:tsAutoUpdate",
-	//  ],
-	//      // Require devices running macOS and a stable
-	//      // Tailscale version.
-	//  "posture:anyMac": [
-	//      "node:os == 'macos'",
-	//      "node:tsReleaseTrack == 'stable'",
-	//  ],
-	// },
-
-	// Define users and devices that can use Tailscale SSH.
+	// Tailscale SSH — unchanged. Members may SSH into their own devices in
+	// "check" mode (re-auth required); does not grant SSH to tagged nodes.
 	"ssh": [
-		// Allow all users to SSH into their own devices in check mode.
-		// Comment this section out if you want to define specific restrictions.
 		{
 			"action": "check",
 			"src":    ["autogroup:member"],
@@ -67,26 +73,23 @@
 		},
 	],
 
+	// Tag ownership — unchanged from the live tailnet. The operator OAuth client
+	// owns tag:k8s-operator and assigns tag:k8s to the proxy devices it creates;
+	// admins own tag:ci.
 	"tagOwners": {
 		"tag:k8s-operator": [],
 		"tag:k8s":          ["tag:k8s-operator"],
 		"tag:ci":           ["autogroup:admin"],
 	},
 
-	"acls": [
+	// Regression guard: asserts CI keeps API access so a future edit can't
+	// silently break Flux reconciliation, and that CI is NOT granted the web
+	// UI port. Tests run on every save/apply.
+	"tests": [
 		{
-			"action": "accept",
-			"src":    ["*"],
-			"dst":    ["tag:k8s:*"],
+			"src":    "tag:ci",
+			"accept": ["tag:k8s:6443"],
+			"deny":   ["tag:k8s:443"],
 		},
 	],
-
-	// Test access rules every time they're saved.
-	// "tests": [
-	//   {
-	//       "src": "alice@example.com",
-	//       "accept": ["tag:example"],
-	//       "deny": ["100.101.102.103:443"],
-	//   },
-	// ],
 }
