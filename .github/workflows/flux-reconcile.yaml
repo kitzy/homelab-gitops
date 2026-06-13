@@ -11,9 +11,9 @@ on:
     branches:
       - main
     paths:
-      - 'apps/**'
-      - 'infrastructure/**'
-      - 'clusters/**'
+      - 'kubernetes/apps/**'
+      - 'kubernetes/infrastructure/**'
+      - 'kubernetes/clusters/**'
 
 jobs:
   reconcile:

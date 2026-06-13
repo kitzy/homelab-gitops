@@ -1,11 +1,13 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: infrastructure-sources
+  name: infrastructure-core
   namespace: flux-system
 spec:
   interval: 10m
-  path: ./infrastructure/sources
+  dependsOn:
+    - name: infrastructure-sources
+  path: ./kubernetes/infrastructure/core
   prune: true
   sourceRef:
     kind: GitRepository

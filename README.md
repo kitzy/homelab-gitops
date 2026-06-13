@@ -1,10 +1,19 @@
 # homelab-gitops
 
-GitOps repository for homelab K3s cluster using Flux CD.
+Monorepo for managing the entire homelab as code.
 
 ## Overview
 
-This repository manages the complete infrastructure and application deployment for a production-grade 5-node Kubernetes cluster running on Proxmox. All configuration is declarative, version-controlled, and automatically synced to the cluster via Flux.
+This repository is the single source of truth for the homelab. Each top-level directory owns one domain of the homelab and is managed declaratively and version-controlled:
+
+| Directory | Domain | Status |
+|-----------|--------|--------|
+| [`kubernetes/`](kubernetes/) | K3s cluster (apps + infrastructure) synced by Flux CD | Active |
+| [`tailscale/`](tailscale/) | Tailnet policy file (ACLs) synced via GitHub Actions | Active |
+| `proxmox/` | Proxmox VMs as code | Planned |
+| `docker/` | Standalone Docker container configs | Planned |
+
+The `kubernetes/` tree manages the complete infrastructure and application deployment for a production-grade 5-node Kubernetes cluster running on Proxmox. All configuration is declarative, version-controlled, and automatically synced to the cluster via Flux.
 
 **Key principles:**
 - Everything in Git - infrastructure, applications, and configuration
@@ -55,40 +64,39 @@ Developer                 GitHub                    K3s Cluster
 
 ```
 homelab-gitops/
-├── .github/                 # GitHub Actions workflows
+├── .github/                     # GitHub Actions workflows
 │   ├── workflows/
-│   │   └── flux-reconcile.yaml  # Automated Flux reconciliation
-│   └── README.md            # GitHub Actions setup guide
+│   │   ├── flux-reconcile.yaml  # Automated Flux reconciliation
+│   │   └── pr-validation.yaml   # YAML lint + manifest validation
+│   └── README.md                # GitHub Actions setup guide
 │
-├── infrastructure/           # Core cluster infrastructure
-│   ├── sources/             # Helm chart repositories
-│   │   ├── jetstack.yaml
-│   │   ├── external-secrets.yaml
-│   │   └── longhorn.yaml
-│   ├── core/                # Essential cluster services
-│   │   ├── cert-manager/
-│   │   ├── external-secrets/
-│   │   ├── 1password-connect/
-│   │   └── cloudflare/
-│   ├── networking/          # Networking components
-│   │   ├── cloudflare/
-│   │   └── tailscale/       # Tailscale Kubernetes Operator
-│   └── kustomization.yaml   # Infrastructure root kustomization
+├── kubernetes/                  # K3s cluster, synced by Flux CD
+│   ├── infrastructure/          # Core cluster infrastructure
+│   │   ├── sources/             # Helm chart repositories
+│   │   ├── core/                # cert-manager, external-secrets, 1password
+│   │   ├── networking/          # cloudflare, tailscale operator, metallb, traefik
+│   │   └── backups/             # NFS-backed backup CronJobs
+│   ├── apps/                    # Application deployments
+│   │   ├── hello-world/         # Test application (validates stack)
+│   │   ├── fleet/               # FleetDM endpoint management
+│   │   ├── scanopy/             # Network discovery platform
+│   │   └── kustomization.yaml   # Apps root kustomization
+│   └── clusters/production/     # Cluster-specific Flux configuration
+│       ├── apps.yaml            # Flux Kustomization → kubernetes/apps
+│       ├── infrastructure-*.yaml  # Flux Kustomizations → kubernetes/infrastructure/*
+│       └── flux-system/         # Flux bootstrap configuration
+│           ├── gotk-components.yaml
+│           ├── gotk-sync.yaml   # GitRepository + root Kustomization
+│           └── kustomization.yaml
 │
-├── apps/                    # Application deployments
-│   ├── hello-world/         # Test application (validates stack)
-│   ├── fleet/               # FleetDM endpoint management
-│   ├── scanopy/             # Network discovery platform
-│   └── kustomization.yaml   # Apps root kustomization
-│
-└── clusters/production/     # Cluster-specific configuration
-    ├── infrastructure.yaml  # Points to infrastructure/
-    ├── apps.yaml            # Points to apps/
-    └── flux-system/         # Flux bootstrap configuration
-        ├── gotk-components.yaml
-        ├── gotk-sync.yaml
-        └── kustomization.yaml
+└── tailscale/                   # Tailnet policy file (ACLs) as code
+    ├── policy.hujson            # Source of truth for tailnet ACLs
+    └── README.md                # Setup + GitOps workflow
 ```
+
+> **Note:** the Flux sync root is `./kubernetes/clusters/production`. When bootstrapping,
+> use `flux bootstrap … --path=kubernetes/clusters/production` so the in-cluster
+> `flux-system` Kustomization's `spec.path` matches this location.
 
 ## Getting started
 
@@ -100,7 +108,7 @@ homelab-gitops/
 
 ### Deploying changes
 
-1. **Make changes** to manifests in infrastructure/ or apps/
+1. **Make changes** to manifests in kubernetes/infrastructure/ or kubernetes/apps/
 2. **Commit and push** to GitHub:
    ```bash
    git add .
@@ -119,14 +127,14 @@ homelab-gitops/
 
 ### Adding a new application
 
-1. Create application directory under `apps/`:
+1. Create application directory under `kubernetes/apps/`:
    ```bash
-   mkdir -p apps/my-app
+   mkdir -p kubernetes/apps/my-app
    ```
 
 2. Add Kubernetes manifests:
    ```bash
-   apps/my-app/
+   kubernetes/apps/my-app/
    ├── namespace.yaml
    ├── external-secret.yaml  # If secrets needed
    ├── deployment.yaml
@@ -137,7 +145,7 @@ homelab-gitops/
 
 3. Add to apps kustomization:
    ```yaml
-   # apps/kustomization.yaml
+   # kubernetes/apps/kustomization.yaml
    apiVersion: kustomize.config.k8s.io/v1beta1
    kind: Kustomization
    resources:
