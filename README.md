@@ -9,8 +9,8 @@ This repository is the single source of truth for the homelab. Each top-level di
 | Directory | Domain | Status |
 |-----------|--------|--------|
 | [`kubernetes/`](kubernetes/) | K3s cluster (apps + infrastructure) synced by Flux CD | Active |
-| [`tailscale/`](tailscale/) | Tailnet policy file (ACLs) synced via GitHub Actions | Active |
-| `proxmox/` | Proxmox VMs as code | Planned |
+| [`tailscale/`](tailscale/) | Tailnet config (ACLs, DNS, keys) via Terraform on HCP | Active |
+| `proxmox/` | Proxmox VMs as code (Terraform) | Planned |
 | `docker/` | Standalone Docker container configs | Planned |
 
 The `kubernetes/` tree manages the complete infrastructure and application deployment for a production-grade 5-node Kubernetes cluster running on Proxmox. All configuration is declarative, version-controlled, and automatically synced to the cluster via Flux.
@@ -89,7 +89,10 @@ homelab-gitops/
 │           ├── gotk-sync.yaml   # GitRepository + root Kustomization
 │           └── kustomization.yaml
 │
-└── tailscale/                   # Tailnet policy file (ACLs) as code
+└── tailscale/                   # Tailnet config as code (Terraform root, HCP backend)
+    ├── terraform.tf             # HCP cloud backend + provider versions
+    ├── providers.tf             # Tailscale provider (OAuth via env vars)
+    ├── acl.tf                   # tailscale_acl → applies policy.hujson
     ├── policy.hujson            # Source of truth for tailnet ACLs
     └── README.md                # Setup + GitOps workflow
 ```
