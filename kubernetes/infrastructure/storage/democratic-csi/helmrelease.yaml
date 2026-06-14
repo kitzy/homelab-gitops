@@ -23,9 +23,8 @@ spec:
 
     controller:
       driver:
-        image:
-          repository: docker.io/democraticcsi/democratic-csi
-          tag: latest
+        # Chart consumes this as a plain image string (not a repo/tag map).
+        image: docker.io/democraticcsi/democratic-csi:latest
         # Credentials are injected as env vars and referenced as ${VAR}
         # inside driver.config (expanded by the driver at runtime).
         extraEnv:
@@ -47,9 +46,7 @@ spec:
 
     node:
       driver:
-        image:
-          repository: docker.io/democraticcsi/democratic-csi
-          tag: latest
+        image: docker.io/democraticcsi/democratic-csi:latest
         extraEnv:
           - name: DSM_USERNAME
             valueFrom:
