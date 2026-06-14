@@ -81,7 +81,7 @@ spec:
       name: mysql-data
     spec:
       accessModes: ["ReadWriteOnce"]
-      storageClassName: longhorn
+      storageClassName: synology-iscsi
       resources:
         requests:
           storage: 20Gi

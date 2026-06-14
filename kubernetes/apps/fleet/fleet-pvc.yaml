@@ -5,7 +5,8 @@ metadata:
   namespace: fleet
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
+  storageClassName: synology-iscsi
   resources:
     requests:
       storage: 10Gi
@@ -17,7 +18,8 @@ metadata:
   namespace: fleet
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
+  storageClassName: synology-iscsi
   resources:
     requests:
       storage: 5Gi
