@@ -1,0 +1,93 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: democratic-csi
+  namespace: democratic-csi
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: democratic-csi
+      version: 0.14.6
+      sourceRef:
+        kind: HelmRepository
+        name: democratic-csi
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    csiDriver:
+      name: "org.democratic-csi.synology-iscsi"
+
+    controller:
+      driver:
+        image:
+          repository: docker.io/democraticcsi/democratic-csi
+          tag: latest
+        # Credentials are injected as env vars and referenced as ${VAR}
+        # inside driver.config (expanded by the driver at runtime).
+        extraEnv:
+          - name: DSM_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: democratic-csi-credentials
+                key: DSM_USERNAME
+          - name: DSM_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: democratic-csi-credentials
+                key: DSM_PASSWORD
+          - name: CHAP_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: democratic-csi-credentials
+                key: CHAP_PASSWORD
+
+    node:
+      driver:
+        image:
+          repository: docker.io/democraticcsi/democratic-csi
+          tag: latest
+        extraEnv:
+          - name: DSM_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: democratic-csi-credentials
+                key: DSM_USERNAME
+          - name: DSM_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: democratic-csi-credentials
+                key: DSM_PASSWORD
+          - name: CHAP_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: democratic-csi-credentials
+                key: CHAP_PASSWORD
+
+    driver:
+      config:
+        driver: synology-iscsi
+        synology:
+          host: "https://10.253.20.11"
+          port: 5001
+          https: true
+          username: "${DSM_USERNAME}"
+          password: "${DSM_PASSWORD}"
+          loginApiVersion: 6
+          allowInsecure: true
+          volume: "/volume1"
+        iscsi:
+          targetPortal: "10.253.20.11:3260"
+          namePrefix: "csi-"
+          nameSuffix: ""
+          targetGroups:
+            - targetGroupTag: "k3s-storage"
+              enableChap: true
+              chapUser: "k3s"
+              chapSecret: "${CHAP_PASSWORD}"
+          lunTemplate:
+            type: "THIN"
+            location: "/volume1"
