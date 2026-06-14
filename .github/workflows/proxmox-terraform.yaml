@@ -54,6 +54,21 @@ jobs:
           tags: tag:ci
           version: latest
 
+      - name: Resolve PVE endpoint to Tailscale IP
+        env:
+          PVE_ENDPOINT_URL: ${{ steps.op-secrets.outputs.PVE_ENDPOINT }}
+          PVE_API_TOKEN: ${{ steps.op-secrets.outputs.PVE_API_TOKEN }}
+        run: |
+          # Ubuntu runners have systemd-resolved DNS issues with Tailscale MagicDNS.
+          # Look up the peer IP directly instead of relying on hostname resolution.
+          PVE_HOST=$(echo "$PVE_ENDPOINT_URL" | sed -E 's|https?://([^/:]+).*|\1|')
+          PVE_IP=$(tailscale status --json | \
+            jq -r --arg h "${PVE_HOST}." \
+            '.Peer[] | select(.DNSName == $h) | .TailscaleIPs[0]')
+          echo "PROXMOX_VE_ENDPOINT=https://${PVE_IP}:8006/" >> "$GITHUB_ENV"
+          echo "PROXMOX_VE_API_TOKEN=${PVE_API_TOKEN}" >> "$GITHUB_ENV"
+          echo "PROXMOX_VE_INSECURE=true" >> "$GITHUB_ENV"
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -72,10 +87,6 @@ jobs:
         id: plan
         if: github.event_name == 'pull_request'
         continue-on-error: true # comment the result on the PR before failing on error
-        env:
-          PROXMOX_VE_ENDPOINT: ${{ steps.op-secrets.outputs.PVE_ENDPOINT }}
-          PROXMOX_VE_API_TOKEN: ${{ steps.op-secrets.outputs.PVE_API_TOKEN }}
-          PROXMOX_VE_INSECURE: "true"
         run: terraform plan -no-color -input=false
 
       - name: Comment plan on PR
@@ -138,8 +149,4 @@ jobs:
 
       - name: Terraform apply
         if: github.event_name == 'push'
-        env:
-          PROXMOX_VE_ENDPOINT: ${{ steps.op-secrets.outputs.PVE_ENDPOINT }}
-          PROXMOX_VE_API_TOKEN: ${{ steps.op-secrets.outputs.PVE_API_TOKEN }}
-          PROXMOX_VE_INSECURE: "true"
         run: terraform apply -auto-approve -input=false
