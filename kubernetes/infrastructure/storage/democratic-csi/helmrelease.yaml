@@ -21,6 +21,13 @@ spec:
     csiDriver:
       name: "org.democratic-csi.synology-iscsi"
 
+    storageClasses:
+      - name: synology-iscsi
+        defaultClass: true
+        reclaimPolicy: Retain
+        volumeBindingMode: Immediate
+        allowVolumeExpansion: true
+
     controller:
       driver:
         image: docker.io/democraticcsi/democratic-csi:latest
