@@ -11,7 +11,7 @@ spec:
   storageClassName: nfs
   nfs:
     server: 10gb-nas.kitzy.net
-    path: /volume1/k8s-backups
+    path: /volume2/k8s-backups
   mountOptions:
     - hard
     - nfsvers=4.1
