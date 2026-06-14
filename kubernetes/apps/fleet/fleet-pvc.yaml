@@ -7,6 +7,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   storageClassName: synology-iscsi
+  volumeName: pvc-8d723f76-81e8-47ec-9f04-c1b9a0cbe334
   resources:
     requests:
       storage: 10Gi
@@ -20,6 +21,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   storageClassName: synology-iscsi
+  volumeName: pvc-9f43e49a-af36-4c25-a93b-c934a446108e
   resources:
     requests:
       storage: 5Gi
