@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   - hello-world
   - fleet
-  - fleet-sandbox
   - scanopy
   - authentik
   - portainer
