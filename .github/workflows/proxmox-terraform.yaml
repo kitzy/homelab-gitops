@@ -1,0 +1,145 @@
+name: Proxmox Terraform
+
+# GitOps for the Proxmox VE cluster (proxmox/ Terraform root).
+#   - Pull requests touching proxmox/** run fmt/validate/plan (no changes).
+#   - Push to main touching proxmox/** runs apply.
+# HCP Terraform holds remote state (local execution); secrets come from 1Password.
+# The runner joins the Tailscale tailnet to reach the private PVE API.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'proxmox/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'proxmox/**'
+
+permissions:
+  contents: read
+  pull-requests: write # the plan job posts the Terraform plan as a PR comment
+
+jobs:
+  terraform:
+    name: Plan / Apply
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: proxmox
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        id: op-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          TF_API_TOKEN: op://GitHub/Terraform Cloud/credential
+          TS_OAUTH_CLIENT_ID: op://GitHub/Tailscale/OAUTH_CLIENT_ID
+          TS_OAUTH_SECRET: op://GitHub/Tailscale/OAUTH_SECRET
+          PVE_ENDPOINT: op://GitHub/Proxmox/endpoint
+          PVE_API_TOKEN: op://GitHub/Proxmox/api_token
+
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ steps.op-secrets.outputs.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ steps.op-secrets.outputs.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          version: latest
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ steps.op-secrets.outputs.TF_API_TOKEN }}
+
+      - name: Terraform fmt
+        run: terraform fmt -check
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        continue-on-error: true # comment the result on the PR before failing on error
+        env:
+          PROXMOX_VE_ENDPOINT: ${{ steps.op-secrets.outputs.PVE_ENDPOINT }}
+          PROXMOX_VE_API_TOKEN: ${{ steps.op-secrets.outputs.PVE_API_TOKEN }}
+          PROXMOX_VE_INSECURE: "true"
+        run: terraform plan -no-color -input=false
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          PLAN_STDOUT: ${{ steps.plan.outputs.stdout }}
+          PLAN_STDERR: ${{ steps.plan.outputs.stderr }}
+        with:
+          script: |
+            const marker = '<!-- proxmox-terraform-plan -->';
+            const stdout = process.env.PLAN_STDOUT || '';
+            const stderr = process.env.PLAN_STDERR || '';
+            const raw = (stderr ? stdout + '\n' + stderr : stdout).trim() || '(no output)';
+            const max = 60000;
+            const plan = raw.length > max
+              ? raw.slice(0, max) + '\n\n... output truncated; see the workflow run logs for the full plan.'
+              : raw;
+            const ok = '${{ steps.plan.outputs.exitcode }}' === '0';
+            const body = [
+              marker,
+              `## Proxmox Terraform plan ${ok ? '📋' : '❌'}`,
+              '',
+              '<details><summary>Show plan</summary>',
+              '',
+              '```terraform',
+              plan,
+              '```',
+              '',
+              '</details>',
+              '',
+              '*Merging to `main` runs `terraform apply`.*',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan errored
+        if: github.event_name == 'pull_request' && steps.plan.outputs.exitcode != '0'
+        run: exit 1
+
+      - name: Terraform apply
+        if: github.event_name == 'push'
+        env:
+          PROXMOX_VE_ENDPOINT: ${{ steps.op-secrets.outputs.PVE_ENDPOINT }}
+          PROXMOX_VE_API_TOKEN: ${{ steps.op-secrets.outputs.PVE_API_TOKEN }}
+          PROXMOX_VE_INSECURE: "true"
+        run: terraform apply -auto-approve -input=false
