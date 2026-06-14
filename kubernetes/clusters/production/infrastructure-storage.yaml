@@ -1,0 +1,18 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-storage
+  namespace: flux-system
+spec:
+  interval: 10m
+  # Depends on infrastructure-core: that is where the onepassword Connect
+  # deployment and the onepassword ClusterSecretStore live, which the
+  # democratic-csi ExternalSecret needs before it can sync credentials.
+  dependsOn:
+    - name: infrastructure-core
+  path: ./kubernetes/infrastructure/storage
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
