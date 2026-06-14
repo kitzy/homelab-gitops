@@ -68,8 +68,8 @@ spec:
       config:
         driver: synology-iscsi
         synology:
-          host: "https://10.253.20.11"
-          port: 5001
+          host: "https://nas.kitzy.net"
+          port: 443
           https: true
           username: "${DSM_USERNAME}"
           password: "${DSM_PASSWORD}"
