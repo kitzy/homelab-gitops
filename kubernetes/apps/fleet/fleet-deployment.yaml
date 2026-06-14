@@ -34,7 +34,7 @@ metadata:
   name: fleet
   namespace: fleet
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: fleet
