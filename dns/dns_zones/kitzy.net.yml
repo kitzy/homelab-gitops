@@ -35,11 +35,6 @@ records:
     type: A
     values:
       - "100.34.107.84"
-  - name: "fleet-sandbox"
-    ttl: 300
-    type: A
-    values:
-      - "100.34.107.85"
   - name: "nas"
     ttl: 300
     type: A
