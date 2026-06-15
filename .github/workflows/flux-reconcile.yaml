@@ -59,6 +59,7 @@ jobs:
           kubectl get nodes
 
       - name: Setup Flux CLI
+        if: always()
         uses: fluxcd/flux2/action@main
 
       - name: Reconcile Flux
