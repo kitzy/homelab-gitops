@@ -42,6 +42,23 @@ spec:
                 fleet | gzip > "$BACKUP_FILE"
 
               echo "Backup completed: $(ls -lh $BACKUP_FILE)"
+
+              # Verify the backup is readable and contains the core tables
+              echo "Verifying backup integrity..."
+              TABLES=$(zcat "$BACKUP_FILE" | grep -c "^-- Table structure for table")
+              if [ "$TABLES" -lt 100 ]; then
+                echo "ERROR: Backup verification failed - only $TABLES tables found (expected 100+), backup may be corrupt"
+                rm -f "$BACKUP_FILE"
+                exit 1
+              fi
+              for TABLE in users migration_status_tables hosts; do
+                if ! zcat "$BACKUP_FILE" | grep -q "Table structure for table \`${TABLE}\`"; then
+                  echo "ERROR: Backup verification failed - missing critical table: $TABLE"
+                  rm -f "$BACKUP_FILE"
+                  exit 1
+                fi
+              done
+              echo "Backup verified: $TABLES tables present, all critical tables found"
             env:
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
