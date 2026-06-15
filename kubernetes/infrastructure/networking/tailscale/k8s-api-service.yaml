@@ -30,7 +30,6 @@ subsets:
       # Get them with: kubectl get nodes -o wide
       - ip: 100.115.235.1  # Control plane 1
       - ip: 100.106.127.19  # Control plane 2
-      - ip: 100.77.140.69  # Control plane 3
     ports:
       - name: https
         port: 6443
