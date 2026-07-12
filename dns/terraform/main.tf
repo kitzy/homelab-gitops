@@ -52,15 +52,18 @@ locals {
     )
   }
 
-  # Separate zones by provider (zones can appear in multiple provider maps)
+  # Separate zones by provider (zones can appear in multiple provider maps).
+  # Zones marked "registrar_only" are excluded from hosted zone/record
+  # management here (their DNS is managed elsewhere); only their apex NS
+  # records still drive the registrar nameserver update below.
   route53_zones = {
     for zname, z in local.zones :
-    zname => z if contains(local.zone_providers[zname], "route53")
+    zname => z if contains(local.zone_providers[zname], "route53") && !try(z.registrar_only, false)
   }
 
   cloudflare_zones = {
     for zname, z in local.zones :
-    zname => z if contains(local.zone_providers[zname], "cloudflare")
+    zname => z if contains(local.zone_providers[zname], "cloudflare") && !try(z.registrar_only, false)
   }
 
   # Extract nameservers from NS records for registered domain management

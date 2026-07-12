@@ -27,6 +27,13 @@ for filename in os.listdir(DNS_ZONES_DIR):
     with open(path, "r") as f:
         zone_data = yaml.safe_load(f)
     zone_name = zone_data["zone_name"]
+
+    # Skip zones whose DNS is managed elsewhere; this repo only updates the
+    # registrar nameservers for them and must not touch their records.
+    if zone_data.get("registrar_only"):
+        print(f"Skipping zone (registrar_only): {zone_name}")
+        continue
+
     defined = load_defined_records(zone_data, zone_name)
 
     resp = route53.list_hosted_zones_by_name(DNSName=zone_name)
