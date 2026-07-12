@@ -179,7 +179,13 @@ def main():
             zone_data = yaml.safe_load(f)
         
         zone_name = zone_data["zone_name"]
-        
+
+        # Skip zones whose DNS is managed elsewhere; this repo only updates
+        # the registrar nameservers for them and must not touch their records.
+        if zone_data.get("registrar_only"):
+            print(f"\nSkipping zone (registrar_only): {zone_name}")
+            continue
+
         # Check if this zone uses Cloudflare
         provider = zone_data.get("provider")
         providers = zone_data.get("providers", [])
