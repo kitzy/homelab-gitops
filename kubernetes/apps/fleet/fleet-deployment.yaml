@@ -45,7 +45,7 @@ spec:
     spec:
       initContainers:
       - name: migrate-db
-        image: fleetdm/fleet:v4.88.1
+        image: fleetdm/fleet:v4.89.1
         command:
           - /usr/bin/fleet
           - prepare
@@ -65,7 +65,7 @@ spec:
               key: mysql-password
       containers:
       - name: fleet
-        image: fleetdm/fleet:v4.88.1
+        image: fleetdm/fleet:v4.89.1
         resources:
           requests:
             memory: "2Gi"
