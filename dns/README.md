@@ -329,6 +329,7 @@ Each zone file supports the following top-level keys:
 | `zone_name` | yes | The domain name for the zone |
 | `provider` | no* | Single DNS provider: `route53` or `cloudflare` |
 | `providers` | no* | List of DNS providers: `[route53, cloudflare]` |
+| `registrar_only` | no | If `true`, this repo does **not** manage the hosted zone or records for the domain (Terraform and the nightly cleanup scripts skip it). Only the apex `NS` records are used, to update the registrar nameservers. Use this when the domain's DNS is managed in another account/repo but you still want to point its nameservers from here. |
 | `records` | yes | Array of DNS records for the zone |
 
 *Either `provider` or `providers` is required, but not both.
