@@ -12,7 +12,8 @@
 // tailscale/README.md):
 //   tag:server  -> pve1, pve2, homelab-01, nova
 //   tag:mgmt    -> glkvm   (out-of-band KVM)
-//   tag:router  -> somerset-pi, woolston-gateway  (subnet routers + exit nodes)
+//   tag:router  -> somerset-pi, woolston-gateway, middlesex-pi, piscataway-pi
+//                  (subnet routers + exit nodes)
 //
 // Everything not granted below is denied.
 {
@@ -51,6 +52,8 @@
 				"10.253.20.0/24",  // woolston-gateway (cluster LAN / MetalLB)
 				"10.253.30.0/24",  // woolston-gateway
 				"10.54.1.0/24",    // somerset-pi
+				"10.113.1.0/24",   // middlesex-pi
+				"10.62.1.0/24",    // piscataway-pi
 			],
 			"ip": ["*"],
 		},
@@ -102,6 +105,8 @@
 			"10.253.20.0/24": ["tag:router"],
 			"10.253.30.0/24": ["tag:router"],
 			"10.54.1.0/24":   ["tag:router"],
+			"10.113.1.0/24":  ["tag:router"],
+			"10.62.1.0/24":   ["tag:router"],
 		},
 		"exitNode": ["tag:router"],
 	},
