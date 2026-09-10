@@ -30,13 +30,18 @@ spec:
       containers:
       - name: mysql
         image: mysql:8.0
+        args:
+        # Default is 128Mi, far too small for ~25 hosts' worth of
+        # label_membership/query_results churn; was causing sustained
+        # InnoDB row-lock waits and Fleet /healthz timeouts.
+        - "--innodb-buffer-pool-size=1073741824"
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "500m"
-          limits:
-            memory: "2Gi"
+            memory: "1536Mi"
             cpu: "1000m"
+          limits:
+            memory: "3Gi"
+            cpu: "3000m"
         env:
         - name: MYSQL_ROOT_PASSWORD
           valueFrom:
