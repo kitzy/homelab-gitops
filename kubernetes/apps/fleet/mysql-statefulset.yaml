@@ -35,6 +35,11 @@ spec:
         # label_membership/query_results churn; was causing sustained
         # InnoDB row-lock waits and Fleet /healthz timeouts.
         - "--innodb-buffer-pool-size=1073741824"
+        # Single instance, no replicas/point-in-time recovery use binlogs
+        # here. Unbounded binlog growth (no expiry ever ran because the
+        # server kept crashing before it could purge) filled the 20Gi PVC
+        # and took mysqld down with "No space left on device".
+        - "--skip-log-bin"
         resources:
           requests:
             memory: "1536Mi"
@@ -89,4 +94,4 @@ spec:
       storageClassName: synology-iscsi
       resources:
         requests:
-          storage: 20Gi
+          storage: 35Gi
