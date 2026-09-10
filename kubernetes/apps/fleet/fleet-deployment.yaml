@@ -170,6 +170,7 @@ spec:
             scheme: HTTPS
           initialDelaySeconds: 60
           periodSeconds: 30
+          timeoutSeconds: 5
 
         readinessProbe:
           httpGet:
@@ -178,6 +179,7 @@ spec:
             scheme: HTTPS
           initialDelaySeconds: 30
           periodSeconds: 10
+          timeoutSeconds: 5
 
       volumes:
       - name: tls-cert
