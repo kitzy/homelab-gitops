@@ -26,10 +26,34 @@ spec:
     metadata:
       labels:
         app: mysql
+        workload-class: database
     spec:
+      affinity:
+        # Spread database pods across nodes (all namespaces) so a single
+        # node failure doesn't take every database down at once. Soft rule:
+        # still schedules if only one node is available.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              namespaceSelector: {}
+              labelSelector:
+                matchLabels:
+                  workload-class: database
+        # Keep off the etcd/control-plane nodes where possible, matching the
+        # backup CronJobs. Soft so databases can still land there if both
+        # workers are down.
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: DoesNotExist
       containers:
       - name: mysql
-        image: mysql:8.0
+        image: mysql:8.0.46
         args:
         # Default is 128Mi, far too small for ~25 hosts' worth of
         # label_membership/query_results churn; was causing sustained
