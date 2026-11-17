@@ -43,6 +43,13 @@ mkdir -p "$SHARE_PATH/homelab-vps"
 chown restic:users "$SHARE_PATH/homelab-vps"
 chmod 700 "$SHARE_PATH/homelab-vps"
 
+echo "== deny other shares"
+# New users inherit the `users` group's access. On this NAS that includes
+# Plex (found 2026-11-17). Add any other share `restic` can see here.
+for other in Plex; do
+  synoshare --setuser "$other" NA + restic && echo "restic denied on $other"
+done
+
 echo "== ssh key"
 mkdir -p "$HOME_DIR/.ssh"
 grep -qxF "$PUBKEY" "$HOME_DIR/.ssh/authorized_keys" 2>/dev/null || echo "$PUBKEY" >> "$HOME_DIR/.ssh/authorized_keys"
