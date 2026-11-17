@@ -2,7 +2,7 @@ name: DNS Sync
 
 # Apply DNS (Route53 + Cloudflare) on push to main touching dns/**.
 # HCP Terraform holds remote state (workspace "dns", local execution); secrets
-# come from 1Password. Mirrors the tailscale/flux secret pattern.
+# come from 1Password. Mirrors the tailscale/ and vps/ secret pattern.
 
 on:
   push:

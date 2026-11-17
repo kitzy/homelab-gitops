@@ -4,7 +4,7 @@ This directory is a **Terraform root module** that manages the Tailscale tailnet
 code — currently the tailnet **policy file** (ACLs, grants, tags, SSH), with DNS,
 auth keys, and device authorization planned (see [Roadmap](#roadmap)).
 
-It follows the same pattern as [`kitzy/dns`](https://github.com/kitzy/dns): **HCP
+It follows the same pattern as [`dns/`](../dns/) and [`vps/terraform/`](../vps/terraform/): **HCP
 Terraform holds the remote state** (local execution mode), and **GitHub Actions** runs
 `plan` on PRs and `apply` on merge. Secrets come from the 1Password `GitHub` vault.
 
@@ -92,7 +92,7 @@ Create the items/fields to match those references (item `Terraform Cloud` with f
 
 | Tag | Owner | Used by |
 |-----|-------|---------|
-| `tag:server` | `autogroup:admin` | pve1, pve2, homelab-01, nova |
+| `tag:server` | `autogroup:admin` | pve1, homelab-01, nova |
 | `tag:mgmt` | `autogroup:admin` | glkvm (out-of-band KVM) |
 | `tag:router` | `autogroup:admin` | Subnet routers and exit nodes |
 | `tag:vps` | `autogroup:admin` | `homelab-vps` (Vultr VM) |
@@ -110,7 +110,7 @@ discipline as the ACL), then added as its own resource/PR:
 - [ ] **DNS — nameservers / search paths / split-DNS** — currently empty on the tailnet;
       add `tailscale_dns_nameservers` / `tailscale_dns_search_paths` /
       `tailscale_dns_split_nameservers` when a resolver or internal domains are configured
-- [ ] **Auth keys** — `tailscale_tailnet_key` (e.g. the operator/CI bootstrap keys)
+- [ ] **Auth keys** — `tailscale_tailnet_key`. The `homelab-vps` bootstrap key is minted in [`vps/terraform/`](../vps/terraform/main.tf), next to the VM that uses it.
 - [ ] **Device authorization / posture** as needed
 
 ## Safety notes
@@ -133,4 +133,4 @@ discipline as the ACL), then added as its own resource/PR:
 - [Tailscale Terraform provider](https://registry.terraform.io/providers/tailscale/tailscale/latest/docs)
 - [`tailscale_acl` resource](https://registry.terraform.io/providers/tailscale/tailscale/latest/docs/resources/acl)
 - [Tailnet policy file syntax](https://tailscale.com/kb/1337/policy-syntax)
-- [`kitzy/dns`](https://github.com/kitzy/dns) — the sibling repo this pattern mirrors
+- [`dns/`](../dns/) — the DNS root in this repo, which follows the same pattern

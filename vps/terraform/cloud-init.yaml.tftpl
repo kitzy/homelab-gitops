@@ -102,7 +102,8 @@ runcmd:
     echo "UUID=$(blkid -s UUID -o value "$dev") /var/lib/docker ext4 defaults,nofail 0 2" >> /etc/fstab
     mount /var/lib/docker
 %{ endif ~}
-  # 4 GB swap. Real memory use is unmeasured, and the plan has no swap.
+  # Swap. Vultr's Ubuntu image already ships an 8 GB /swapfile, which is
+  # kept. This adds 4 GB only on an image that has none.
   - |
     set -eu
     if [ ! -f /swapfile ]; then

@@ -32,7 +32,7 @@ Image versions in `compose/` are pinned. Renovate opens PRs for updates (see [`r
 
 ## Where to look
 
-- **The VM, the stacks, backups, and the restore runbook:** [`vps/README.md`](vps/README.md)
+- **The VM, the stacks, updates, backups, and disaster recovery:** [`vps/README.md`](vps/README.md)
 - **Tailnet policy and setup:** [`tailscale/README.md`](tailscale/README.md)
 - **DNS zones and tunnel records:** [`dns/README.md`](dns/README.md)
 
