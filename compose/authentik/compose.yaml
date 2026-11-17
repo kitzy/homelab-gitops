@@ -50,7 +50,7 @@ services:
   # Replaces the old fix-permissions init container. The server and worker
   # run as uid 1000 and need to write /media.
   authentik-media-perms:
-    image: busybox:1.37.0
+    image: busybox:1.38.0
     profiles: [app]
     command: ["sh", "-c", "mkdir -p /media/public && chown -R 1000:1000 /media"]
     volumes:

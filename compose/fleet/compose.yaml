@@ -70,7 +70,7 @@ services:
       start_period: 10s
 
   fleet-volume-perms:
-    image: busybox:1.37.0
+    image: busybox:1.38.0
     profiles: [app]
     command: ["sh", "-c", "chown -R 100:101 /var/lib/fleet/vulndb /var/log/fleet"]
     volumes:
