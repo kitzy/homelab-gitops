@@ -25,6 +25,18 @@
       "labels": ["fleet"]
     },
     {
+      "description": "Authentik refuses to start if a release line (2025.10, 2025.12, 2026.2, ...) is skipped. Within a year, one PR per release line; merge them oldest first, one at a time. Year changes (Renovate major) cannot be split per line, and would offer the new year's newest line, so they wait for approval on the Dependency Dashboard: step through each line of the new year by hand.",
+      "matchManagers": ["docker-compose"],
+      "matchPackageNames": ["ghcr.io/goauthentik/server"],
+      "separateMultipleMajor": true,
+      "separateMultipleMinor": true,
+      "major": {
+        "dependencyDashboardApproval": true
+      },
+      "labels": ["authentik"],
+      "prBodyNotes": ["**Authentik upgrades must go one release line at a time.** If another Authentik PR for an older release line is open, merge that one first and wait until Authentik is healthy. Skipping a line makes Authentik crash-loop with `Major version skips are not allowed` (see vps/README.md, Updates)."]
+    },
+    {
       "description": "Fleet's MySQL stays on 8.0. 8.4 and 9.x change defaults and need a planned upgrade.",
       "matchManagers": ["docker-compose"],
       "matchPackageNames": ["mysql"],
