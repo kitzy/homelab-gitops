@@ -116,8 +116,9 @@ x-pg-dump-script: &pg-dump-script
     if ! pg_dump --format=plain "$$PGDATABASE" > "$$tmp"; then
       rm -f "$$tmp"; exit 1
     fi
-    # pg_dump writes this footer only when it finishes.
-    if ! tail -n 5 "$$tmp" | grep -q "PostgreSQL database dump complete"; then
+    # pg_dump writes this footer only when it finishes. pg_dump 17.6+ adds
+    # `unrestrict` lines after it, so look at the last 20 lines.
+    if ! tail -n 20 "$$tmp" | grep -q "PostgreSQL database dump complete"; then
       echo "ERROR: dump is incomplete"
       rm -f "$$tmp"; exit 1
     fi
