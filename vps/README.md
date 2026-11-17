@@ -154,14 +154,24 @@ Repository: `sftp:restic@10.253.20.10:/backups/homelab-vps`, reached over the Ta
 
 ### Setup
 
-1. **NAS user.** In DSM, create a user `restic` that belongs only to `users`. Create a shared folder `backups` (or reuse one) and give `restic` read/write on it and no access to anything else. In Control Panel, Terminal & SNMP, SSH must be on. In File Services, FTP, SFTP, enable SFTP. In the user's Applications tab, allow only SFTP. DSM chroots SFTP users to the shared-folder root, so the repository path is `/backups/homelab-vps`, not `/volume1/...`. If DSM shows the share under a different path over SFTP, change `RESTIC_REPOSITORY` in the compose file.
+1. **NAS user.** [`nas-restic-setup.sh`](nas-restic-setup.sh) creates the `restic` user (key auth only), a `backups` shared folder on `/volume2` (read/write for `restic` and administrators), `backups/homelab-vps`, `~restic/.ssh/authorized_keys` with the restic public key, and turns on SFTP (it was off). It needs root, so run it with your sudo password:
+
+    ```bash
+    ssh admin@10.253.20.10 'cat > /tmp/nas-restic-setup.sh' < vps/nas-restic-setup.sh
+    ```
+
+    ```bash
+    ssh -t admin@10.253.20.10 'sudo sh /tmp/nas-restic-setup.sh; rm -f /tmp/nas-restic-setup.sh'
+    ```
+
+    (`scp` does not work until SFTP is on.) Afterwards, in DSM, check that `restic` has no access to any other shared folder. DSM chroots SFTP users to the shared-folder root, so the repository path is `/backups/homelab-vps`.
 2. **Key and password.** On your Mac, generate the SSH key and the restic password, and store them in 1Password (`Homelab` vault, item `restic homelab-vps`). The private key is stored base64-encoded on one line, so it survives being an env var:
 
     ```bash
     d=$(mktemp -d) && ssh-keygen -q -t ed25519 -N "" -C restic@homelab-vps -f "$d/id" && op item create --vault Homelab --category password --title "restic homelab-vps" --generate-password='letters,digits,32' "ssh_private_key_b64[concealed]=$(base64 < "$d/id" | tr -d '\n')" "ssh_public_key[text]=$(cat "$d/id.pub")" >/dev/null && cat "$d/id.pub" && rm -rf "$d"
     ```
 
-    Add the printed public key to `~restic/.ssh/authorized_keys` on the NAS. The `.ssh` directory must be mode 700 and the file mode 600, owned by `restic`. DSM's sshd refuses keys with looser permissions.
+    The item `restic homelab-vps` already exists (created 2026-11-17). Its public key is the one in `nas-restic-setup.sh`. If you ever regenerate the key, update the script and re-run it.
 3. **Healthchecks.io.** Create two checks: `homelab-vps backup` (daily, 03:00 America/New_York, grace 2 hours) and `homelab-vps restic check` (weekly, Sunday 05:00, grace 6 hours). Store their ping URLs in a `Homelab` item `Healthchecks homelab-vps`, fields `backup_ping_url` and `check_ping_url`.
 4. **Run each job once by hand** after the databases are restored and the backup stack has deployed. The first `restic-backup` run creates the repository (it initializes only when restic reports that no repository exists, never on a connection or auth error):
 
