@@ -365,7 +365,7 @@ Follow [Backups, Setup](#setup). Then run one full restore drill ([Restore drill
 
 ### Rollback
 
-There is none until PVE is repaired. Then, revert the DNS PR to send traffic back to the `homelab-k3s` tunnel. The old data stays untouched on the Synology until step 10 passes and at least two weeks of stable running (PR 7 cleanup).
+The old cluster is fully retired: its manifests are only in git history, and its Cloudflare tunnel (`homelab-k3s`), Tailscale devices, and credentials were deleted on 2026-11-17. There is no quick rollback. The old iSCSI LUNs and nightly dumps are still on the Synology until they are decommissioned.
 
 ## Security notes
 

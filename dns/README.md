@@ -112,9 +112,9 @@ All tunnels are defined centrally in [`cloudflare_tunnels.yml`](cloudflare_tunne
 **cloudflare_tunnels.yml:**
 ```yaml
 tunnels:
-  homelab-k3s:
-    tunnel_id: "a80b484c-d2e9-484b-bf01-ba385ee9be7e"
-    description: "Homelab Kubernetes cluster tunnel"
+  homelab-vps:
+    tunnel_id: "0b72a860-709f-40ba-816c-7727f12e100f"
+    description: "homelab-vps (Vultr) Docker Compose stacks"
   
   office-server:
     tunnel_id: "xyz789abc-1234-5678-90ab-cdef12345678"
@@ -137,7 +137,7 @@ records:
     type: TUNNEL
     ttl: 300
     tunnel:
-      name: "homelab-k3s"  # References tunnel from cloudflare_tunnels.yml
+      name: "homelab-vps"  # References tunnel from cloudflare_tunnels.yml
       service: "http://myapp.default.svc.cluster.local:8080"
 ```
 
@@ -193,7 +193,7 @@ records:
   - name: "grafana"
     type: TUNNEL
     tunnel:
-      name: "homelab-k3s"
+      name: "homelab-vps"
       service: "http://grafana.monitoring.svc:3000"
 ```
 
@@ -203,7 +203,7 @@ records:
   - name: "nextcloud"
     type: TUNNEL
     tunnel:
-      name: "homelab-k3s"  # Same tunnel, different zone
+      name: "homelab-vps"  # Same tunnel, different zone
       service: "http://nextcloud.default.svc:80"
 ```
 
