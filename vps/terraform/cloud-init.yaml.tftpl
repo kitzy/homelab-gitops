@@ -76,7 +76,7 @@ write_files:
           volumes:
             - /var/run/docker.sock:/var/run/docker.sock
             - data:/data
-          mem_limit: 256m
+          mem_limit: 512m
           healthcheck: # the image's built-in healthcheck command
             start_period: 30s
             interval: 30s
