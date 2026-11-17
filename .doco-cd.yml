@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://doco.cd/v0.134/schemas/deploy.schema.json
+#
+# Doco-CD deploy config for homelab-vps. One YAML document per stack.
+# Doco-CD on the VM polls main and runs `docker compose up` for each stack.
+# See vps/README.md.
+#
+# Rules:
+# - `name` is the Compose project name. Never change it: a new name means a
+#   new project, and the old containers would be orphaned.
+# - Never set destroy.enabled or destroy.remove_volumes. Volumes hold the
+#   databases.
+# - The 1Password provider has no bulk fetch. Every secret is listed here.
+#   Doco-CD resolves them through a read-only service account on the
+#   Homelab vault. Every item must exist before the first deploy, even for
+#   services in an inactive profile.
+#
+# Phase 1 (now): profiles are empty, so only the databases (and cloudflared,
+# which has no profile) run. Restore the dumps into them.
+# Phase 2 (a later PR): set `profiles: [app]` to start the apps.
+
+name: edge
+working_dir: compose/edge
+external_secrets:
+  TUNNEL_TOKEN: op://Homelab/Cloudflare Tunnel/VPS_TUNNEL_TOKEN
+
+---
+name: authentik
+working_dir: compose/authentik
+profiles: []
+timeout: 10m # first boot after a restore runs migrations; start_period is 300 s
+external_secrets:
+  AUTHENTIK_PG_DB: op://Homelab/authentik-secrets/POSTGRES_DB
+  AUTHENTIK_PG_USER: op://Homelab/authentik-secrets/POSTGRES_USER
+  AUTHENTIK_PG_PASSWORD: op://Homelab/authentik-secrets/POSTGRES_PASSWORD
+  AUTHENTIK_SECRET_KEY: op://Homelab/authentik-secrets/AUTHENTIK_SECRET_KEY
+  AUTHENTIK_HOST: op://Homelab/authentik-secrets/AUTHENTIK_HOST
+  AUTHENTIK_COOKIE_DOMAIN: op://Homelab/authentik-secrets/AUTHENTIK_COOKIE_DOMAIN
+
+---
+name: fleet
+working_dir: compose/fleet
+profiles: []
+timeout: 10m # fleet prepare db can take a while on a large database
+external_secrets:
+  MYSQL_ROOT_PASSWORD: op://Homelab/Fleet Secrets/MYSQL_ROOT_PASSWORD
+  MYSQL_PASSWORD: op://Homelab/Fleet Secrets/MYSQL_PASSWORD
+  FLEET_SERVER_PRIVATE_KEY: op://Homelab/Fleet Secrets/FLEET_SERVER_PRIVATE_KEY
+  FLEET_LICENSE_KEY: op://Homelab/Fleet Secrets/FLEET_LICENSE_KEY
+  FLEET_S3_SOFTWARE_INSTALLERS_BUCKET: op://Homelab/Fleet Secrets/FLEET_S3_SOFTWARE_INSTALLERS_BUCKET
+  FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID: op://Homelab/Fleet Secrets/FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID
+  FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY: op://Homelab/Fleet Secrets/FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY
