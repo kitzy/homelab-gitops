@@ -14,6 +14,8 @@
 //   tag:mgmt    -> glkvm   (out-of-band KVM)
 //   tag:router  -> somerset-pi, woolston-gateway, middlesex-pi, piscataway-pi
 //                  (subnet routers + exit nodes)
+//   tag:vps     -> homelab-vps (Vultr VM running the Compose stacks) and the
+//                  scanopy Tailscale sidecar on it
 //
 // Everything not granted below is denied.
 {
@@ -86,6 +88,30 @@
 			"ip":  ["tcp:443", "tcp:6443"],
 		},
 
+		// ---- Vultr VPS (homelab-vps) ------------------------------------------
+		// You reach the VM over Tailscale SSH and the tailnet-only web UIs on it
+		// (e.g. the scanopy sidecar's HTTPS 443).
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:vps"],
+			"ip":  ["tcp:22", "tcp:443"],
+		},
+		// restic backups go over SFTP to the Synology, reached through the
+		// woolston-gateway subnet route. SSH to the NAS only, nothing else.
+		// The VM must run `tailscale up --accept-routes` to use the route.
+		{
+			"src": ["tag:vps"],
+			"dst": ["10.253.20.10"],
+			"ip":  ["tcp:22"],
+		},
+		// The Scanopy daemon on homelab-01 (host network, tag:server) pushes to
+		// the server at scanopy.tail26a1d8.ts.net, which now runs on the VPS.
+		{
+			"src": ["tag:server"],
+			"dst": ["tag:vps"],
+			"ip":  ["tcp:443"],
+		},
+
 		// ---- Personal devices -------------------------------------------------
 		// Your own untagged devices keep full connectivity to each other. Tagged
 		// infra is NOT covered by autogroup:self, so this doesn't re-open it.
@@ -124,7 +150,7 @@
 		{
 			"action": "check",
 			"src":    ["autogroup:member"],
-			"dst":    ["tag:server", "tag:mgmt", "tag:router"],
+			"dst":    ["tag:server", "tag:mgmt", "tag:router", "tag:vps"],
 			"users":  ["autogroup:nonroot", "root"],
 		},
 	],
@@ -136,6 +162,7 @@
 		"tag:server":       ["autogroup:admin"],
 		"tag:mgmt":         ["autogroup:admin"],
 		"tag:router":       ["autogroup:admin"],
+		"tag:vps":          ["autogroup:admin"],
 	},
 
 	// Regression guard. Asserts CI keeps API access and stays contained — it
@@ -146,6 +173,20 @@
 			"src":    "tag:ci",
 			"accept": ["tag:k8s:6443"],
 			"deny":   ["tag:k8s:443", "tag:server:22", "tag:mgmt:443"],
+		},
+		// The VPS reaches only the NAS over SSH (restic SFTP). A compromised VM
+		// must not reach the hypervisors, the KVM, or other NAS services.
+		{
+			"src":    "tag:vps",
+			"accept": ["10.253.20.10:22"],
+			"deny":   ["tag:server:22", "tag:mgmt:22", "10.253.20.10:443"],
+		},
+		// The Scanopy daemon (homelab-01) reaches the server on the VPS, but
+		// gets no shell on it.
+		{
+			"src":    "tag:server",
+			"accept": ["tag:vps:443"],
+			"deny":   ["tag:vps:22"],
 		},
 	],
 }
