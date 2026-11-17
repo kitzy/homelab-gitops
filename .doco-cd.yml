@@ -49,15 +49,6 @@ external_secrets:
   FLEET_S3_SOFTWARE_INSTALLERS_BUCKET: op://Homelab/Fleet Secrets/FLEET_S3_SOFTWARE_INSTALLERS_BUCKET
   FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID: op://Homelab/Fleet Secrets/FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID
   FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY: op://Homelab/Fleet Secrets/FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY
-
----
-name: scanopy
-working_dir: compose/scanopy
-profiles: []
-external_secrets:
-  POSTGRES_PASSWORD: op://Homelab/Scanopy Secrets/POSTGRES_PASSWORD
-  TS_AUTHKEY: op://Homelab/Scanopy Tailscale/credential
-
 ---
 name: backup
 working_dir: compose/backup
@@ -70,7 +61,6 @@ external_secrets:
   AUTHENTIK_PG_DB: op://Homelab/authentik-secrets/POSTGRES_DB
   AUTHENTIK_PG_USER: op://Homelab/authentik-secrets/POSTGRES_USER
   AUTHENTIK_PG_PASSWORD: op://Homelab/authentik-secrets/POSTGRES_PASSWORD
-  SCANOPY_PG_PASSWORD: op://Homelab/Scanopy Secrets/POSTGRES_PASSWORD
   RESTIC_PASSWORD: op://Homelab/restic homelab-vps/password
   RESTIC_SSH_KEY_B64: op://Homelab/restic homelab-vps/ssh_private_key_b64
   HC_BACKUP_URL: op://Homelab/Healthchecks homelab-vps/backup_ping_url
