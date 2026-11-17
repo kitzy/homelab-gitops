@@ -198,12 +198,12 @@ Run `rest-server --append-only` on the NAS (Container Manager) and point restic 
 
 The K3s cluster is down, so fresh dumps are impossible. The data comes from the last nightly dumps the old CronJobs wrote to the NFS share. At most you lose about a day of changes. The old iSCSI volumes stay untouched on the Synology until the new stack is proven.
 
-Container names below follow Compose's `<project>-<service>-1` (for example `fleet-fleet-mysql-1`). Commands run from your Mac unless noted. `nas` means `admin@10.253.20.10`.
+Container names below follow Compose's `<project>-<service>-1` (for example `fleet-fleet-mysql-1`). Commands run from your Mac unless noted. Scanopy is not migrating; its old dumps stay on the NAS.
 
 ### 0. Before you start
 
-- [ ] #180 to #183 merged. The VM exists, Doco-CD is running, and phase 1 is deployed: `ssh root@homelab-vps 'docker ps --format "{{.Names}} {{.Status}}"'` shows the three databases, `fleet-fleet-redis-1`, and `edge-cloudflared-1`, all healthy.
-- [ ] Both new 1Password items exist (`Cloudflare Tunnel/VPS_TUNNEL_TOKEN`, `Scanopy Tailscale`). See [1Password items](#1password-items).
+- [ ] #180 to #183 merged. The VM exists, Doco-CD is running, and phase 1 is deployed: `ssh root@homelab-vps 'docker ps --format "{{.Names}} {{.Status}}"'` shows `authentik-authentik-db-1`, `fleet-fleet-mysql-1`, `fleet-fleet-redis-1`, and `edge-cloudflared-1`, all healthy.
+- [ ] The new 1Password field `Cloudflare Tunnel/VPS_TUNNEL_TOKEN` exists. See [1Password items](#1password-items).
 - [ ] The tunnel `homelab-vps` shows as healthy in Cloudflare Zero Trust. It has no routes yet.
 
 ### 1. Protect the old data
@@ -213,10 +213,14 @@ In DSM, Storage Manager (SAN Manager on DSM 7), take a manual snapshot of every 
 ### 2. Find the latest dumps
 
 ```bash
-ssh nas 'for d in fleet authentik scanopy; do echo "== $d"; ls -lt /volume2/k8s-backups/$d | head -4; done'
+ssh admin@10.253.20.10 'for d in fleet authentik; do echo "== $d"; ls -lt /volume2/k8s-backups/$d | head -4; done'
 ```
 
 Note the newest file for each app and its date. They should all be from the last night the cluster ran. If one is older than the others, note how much data it loses before deciding to go ahead.
+
+Checked on 2026-11-17: the newest dumps are `fleet-20261113-020000.sql.gz` and `authentik-20261113-030000.sql.gz`, both from the cluster's last night. Both were restored into these exact stacks in a local test: Fleet had 17 hosts and migrated forward cleanly; Authentik had 8 users and needed no migrations. Both apps came up healthy.
+
+The link to the NAS runs over the home uplink and one test transfer was cut off partway. That is why the dumps go to a file first and get `gzip -t` before anything is restored. If a check fails, copy that dump again.
 
 Stream them to the VM (nothing lands on your Mac):
 
@@ -225,7 +229,7 @@ ssh root@homelab-vps 'install -d -m 700 /root/restore'
 ```
 
 ```bash
-for d in fleet authentik scanopy; do f=$(ssh nas "ls -t /volume2/k8s-backups/$d/*.sql.gz | head -1"); echo "$f"; ssh nas "cat '$f'" | ssh root@homelab-vps "cat > /root/restore/$d.sql.gz"; done
+for d in fleet authentik; do f=$(ssh admin@10.253.20.10 "ls -t /volume2/k8s-backups/$d/*.sql.gz | head -1"); echo "$f"; ssh admin@10.253.20.10 "cat '$f'" | ssh root@homelab-vps "cat > /root/restore/$d.sql.gz"; done
 ```
 
 ```bash
@@ -247,18 +251,12 @@ gzip -dc /root/restore/fleet.sql.gz | docker exec -i -e MYSQL_PWD=scratch fleet-
 docker exec -e MYSQL_PWD=scratch fleet-scratch mysql -uroot -N fleet -e "SELECT COUNT(*) AS tables FROM information_schema.tables WHERE table_schema=\"fleet\"; SELECT COUNT(*) AS hosts FROM hosts; SELECT MAX(version_id) FROM migration_status_tables;"'
 ```
 
-Scanopy. The image is pinned to `v0.19.6`, whose newest migration is `20261031120000`. The dump's newest migration must be **less than or equal** to that. If it is lower, the server applies the remaining migrations forward on first start, which is the normal upgrade path. If it is **higher**, stop: the dump came from a newer Scanopy, so pin that version in `compose/scanopy/compose.yaml` first.
-
-```bash
-ssh root@homelab-vps "set -o pipefail; gzip -dc /root/restore/scanopy.sql.gz | sed -n '/^COPY public._sqlx_migrations/,/^\\\\\\./p' | cut -f1 | grep -E '^[0-9]+$' | sort -n | tail -1"
-```
-
-Authentik and Scanopy. Each should load with no errors. The scratch database first gets the owner roles the dump refers to, so ownership statements succeed:
+Authentik. It should load with no errors. The scratch database first gets the owner roles the dump refers to, so ownership statements succeed:
 
 ```bash
 ssh root@homelab-vps 'set -eo pipefail
-trap "docker rm -f authentik-scratch scanopy-scratch >/dev/null 2>&1" EXIT
-for d in authentik scanopy; do
+trap "docker rm -f authentik-scratch >/dev/null 2>&1" EXIT
+for d in authentik; do
   docker run -d --rm --name $d-scratch -e POSTGRES_PASSWORD=scratch -e POSTGRES_DB=$d postgres:17.12-alpine >/dev/null
   until docker exec $d-scratch pg_isready -U postgres -d $d >/dev/null 2>&1; do sleep 2; done; sleep 2
   for r in $(gzip -dc /root/restore/$d.sql.gz | grep -oE "OWNER TO [A-Za-z0-9_]+" | cut -d" " -f3 | sort -u); do
@@ -275,7 +273,7 @@ done'
 Confirm none of the apps ever started. If an app booted against an empty database, it ran its migrations, and the restore would collide:
 
 ```bash
-ssh root@homelab-vps 'docker ps -a --format "{{.Names}}" | grep -E "authentik-server|authentik-worker|fleet-fleet-1|fleet-migrate|scanopy-server" || echo "no app containers: good"'
+ssh root@homelab-vps 'docker ps -a --format "{{.Names}}" | grep -E "authentik-server|authentik-worker|fleet-fleet-1|fleet-migrate" || echo "no app containers: good"'
 ```
 
 If any exist, stop them, then drop and recreate that database before restoring.
@@ -296,12 +294,6 @@ Authentik:
 ssh root@homelab-vps 'set -o pipefail; gzip -dc /root/restore/authentik.sql.gz | docker exec -i authentik-authentik-db-1 sh -c "psql -q -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\"" >/dev/null && echo authentik restored'
 ```
 
-Scanopy:
-
-```bash
-ssh root@homelab-vps 'set -o pipefail; gzip -dc /root/restore/scanopy.sql.gz | docker exec -i scanopy-scanopy-db-1 psql -q -v ON_ERROR_STOP=1 -U postgres -d scanopy >/dev/null && echo scanopy restored'
-```
-
 If a restore fails partway, do not retry on top of it. Drop and recreate the database (`DROP DATABASE ...; CREATE DATABASE ...;` as the superuser), then run it again.
 
 ### 6. Authentik media (optional)
@@ -316,7 +308,7 @@ If that is not worth the effort, skip it and re-upload icons and branding in the
 
 ### 7. Phase 2: start the apps
 
-Merge the PR that sets `profiles: [app]` on `authentik`, `fleet`, and `scanopy` in `.doco-cd.yml`. Before merging, delete the old `scanopy` device in the Tailscale admin console if you have not already, so the sidecar gets the `scanopy` name.
+Merge the PR that sets `profiles: [app]` on `authentik` and `fleet` in `.doco-cd.yml`.
 
 Watch it come up (Authentik may take a few minutes if it runs migrations):
 
@@ -328,7 +320,7 @@ ssh root@homelab-vps 'docker logs doco-cd --since 10m 2>&1 | tail -30; docker ps
 ssh root@homelab-vps 'docker logs fleet-fleet-migrate-1 2>&1 | tail -5'
 ```
 
-`fleet prepare db` should report that migrations are already done (same Fleet version), or apply only a few.
+The Nov 13 Fleet dump is from before v4.95.0, so `fleet prepare db` applies about 24 migrations (seen in the local test). If Fleet then crash-loops with `decrypting mdm config asset ... message authentication failed`, `FLEET_SERVER_PRIVATE_KEY` does not match the one the data was encrypted with. The key in 1Password was confirmed to work against this dump.
 
 ### 8. Smoke test before DNS
 
@@ -347,12 +339,6 @@ ssh -L 9000:<authentik-server-ip>:9000 root@homelab-vps
 ```
 
 Then open `http://localhost:9000` and log in. Full SSO flows depend on the real hostname, so they are tested after cutover.
-
-Scanopy is on the tailnet already. Open `https://scanopy.tail26a1d8.ts.net` and check that the daemon on `homelab-01` reconnects:
-
-```bash
-ssh homelab-01 'sudo docker logs --since 10m scanopy-daemon 2>&1 | tail -5'
-```
 
 ### 9. DNS cutover
 
