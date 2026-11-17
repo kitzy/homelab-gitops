@@ -9,5 +9,4 @@ rules:
   new-line-at-end-of-file: enable
 
 ignore: |
-  kubernetes/clusters/production/flux-system/gotk-components.yaml
   dns/

@@ -1,22 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["kubernetes", "docker-compose"],
-  "kubernetes": {
-    "managerFilePatterns": ["/^kubernetes/apps/fleet/.+\\.ya?ml$/"]
-  },
+  "enabledManagers": ["docker-compose"],
   "docker-compose": {
     "managerFilePatterns": ["/^compose/[^/]+/compose\\.ya?ml$/"]
   },
   "packageRules": [
     {
-      "description": "Only manage the Fleet image; mysql, redis, etc. in the same directory are left alone",
-      "matchManagers": ["kubernetes"],
-      "enabled": false
-    },
-    {
       "description": "Fleet stable (vX.Y.Z) and RC (rc-minor-fleet-vX.Y.Z / rc-patch-fleet-vX.Y.Z) tags. RCs count as prereleases of the same version, so the newest of either is proposed, and a stable release supersedes its RC. RC tags are rebuilt in place, so digests are pinned to catch re-pushes.",
-      "matchManagers": ["kubernetes", "docker-compose"],
+      "matchManagers": ["docker-compose"],
       "matchPackageNames": ["fleetdm/fleet"],
       "enabled": true,
       "versioning": "regex:^(?:(?<prerelease>rc)-(?:minor|patch)-fleet-)?v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",

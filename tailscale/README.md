@@ -6,12 +6,9 @@ auth keys, and device authorization planned (see [Roadmap](#roadmap)).
 
 It follows the same pattern as [`kitzy/dns`](https://github.com/kitzy/dns): **HCP
 Terraform holds the remote state** (local execution mode), and **GitHub Actions** runs
-`plan` on PRs and `apply` on merge. Secrets come from 1Password, matching the repo's
-existing [`flux-reconcile.yaml`](../.github/workflows/flux-reconcile.yaml).
+`plan` on PRs and `apply` on merge. Secrets come from the 1Password `GitHub` vault.
 
-> **Scope:** this manages tailnet-wide configuration. It is **separate** from the
-> in-cluster [Tailscale Kubernetes Operator](../kubernetes/infrastructure/networking/tailscale/),
-> which exposes K3s workloads to the tailnet and is managed by Flux. The two are unrelated.
+> **Scope:** this manages tailnet-wide configuration.
 
 ## Files
 
@@ -95,9 +92,12 @@ Create the items/fields to match those references (item `Terraform Cloud` with f
 
 | Tag | Owner | Used by |
 |-----|-------|---------|
-| `tag:k8s-operator` | — | Tailscale Kubernetes Operator (the operator device) |
-| `tag:k8s` | `tag:k8s-operator` | Devices the operator creates to expose services |
-| `tag:ci` | `autogroup:admin` | Ephemeral GitHub Actions node in the Flux reconcile workflow |
+| `tag:server` | `autogroup:admin` | pve1, pve2, homelab-01, nova |
+| `tag:mgmt` | `autogroup:admin` | glkvm (out-of-band KVM) |
+| `tag:router` | `autogroup:admin` | Subnet routers and exit nodes |
+| `tag:vps` | `autogroup:admin` | `homelab-vps` (Vultr VM) |
+
+The K3s tags (`tag:k8s`, `tag:k8s-operator`, `tag:ci`) were removed with the cluster in November 2026.
 
 ## Roadmap
 

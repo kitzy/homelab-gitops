@@ -1,5 +1,5 @@
 # Fleet: server, one-shot migration, MySQL, and Redis. Ported from
-# kubernetes/apps/fleet.
+# the retired K3s manifests (kubernetes/apps/fleet, now only in git history).
 #
 # Changes from the K8s version:
 # - Fleet serves plain HTTP (FLEET_SERVER_TLS=false). cloudflared terminates
