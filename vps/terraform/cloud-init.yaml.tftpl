@@ -138,6 +138,10 @@ runcmd:
     systemctl enable --now tailscaled
     tailscale up --ssh --accept-routes --advertise-tags=tag:vps --hostname=${hostname} --auth-key=${tailscale_auth_key}
 
+  # Admin access is Tailscale SSH, which does not use sshd. Turn sshd off so
+  # nothing listens on the public interface even if the firewall is changed.
+  - systemctl disable --now ssh.socket ssh.service
+
   # Shared network for cloudflared and the apps' HTTP services.
   - docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
 
