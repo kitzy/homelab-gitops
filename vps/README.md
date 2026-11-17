@@ -1,6 +1,6 @@
 # homelab-vps
 
-One Vultr VM runs Authentik, Fleet, and Scanopy as Docker Compose stacks. [Doco-CD](https://doco.cd) on the VM polls this repo and deploys the stacks listed in [`.doco-cd.yml`](../.doco-cd.yml). This replaces the K3s, Flux, and Proxmox stack under [`kubernetes/`](../kubernetes/), which stays in the repo until the old data is decommissioned.
+One Vultr VM runs Authentik and Fleet as Docker Compose stacks. [Doco-CD](https://doco.cd) on the VM polls this repo and deploys the stacks listed in [`.doco-cd.yml`](../.doco-cd.yml). This replaces the K3s, Flux, and Proxmox stack under [`kubernetes/`](../kubernetes/), which stays in the repo until the old data is decommissioned.
 
 | Piece | Where |
 | --- | --- |
