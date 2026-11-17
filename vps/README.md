@@ -113,7 +113,7 @@ Conventions:
   | fleet-mysql | 2 GB (buffer pool 1 GB) |
   | fleet-redis | 256 MB |
   | cloudflared | 192 MB |
-  | doco-cd | 256 MB (the 1Password provider raises its memory use) |
+  | doco-cd | 512 MB (measured ~210 MB while deploying; the 1Password provider raises its memory use) |
 
   Check `docker stats` in the first week. If use stays above about 6.5 GB, move to the 16 GB plan (about $81 a month) by changing `plan` in [`terraform/variables.tf`](terraform/variables.tf). A plan resize is an in-place change on Vultr. Read the Terraform plan before merging to make sure it says update, not replace.
 
