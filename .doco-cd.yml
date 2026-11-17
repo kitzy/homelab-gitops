@@ -14,9 +14,8 @@
 #   Homelab vault. Every item must exist before the first deploy, even for
 #   services in an inactive profile.
 #
-# Phase 1 (now): profiles are empty, so only the databases (and cloudflared,
-# which has no profile) run. Restore the dumps into them.
-# Phase 2 (a later PR): set `profiles: [app]` to start the apps.
+# Phase 2 (now): `profiles: [app]` runs the apps. Phase 1 had empty profiles,
+# so only the databases ran while the old dumps were restored into them.
 
 name: edge
 working_dir: compose/edge
@@ -26,7 +25,7 @@ external_secrets:
 ---
 name: authentik
 working_dir: compose/authentik
-profiles: []
+profiles: [app]
 timeout: 10m # first boot after a restore runs migrations; start_period is 300 s
 external_secrets:
   AUTHENTIK_PG_DB: op://Homelab/authentik-secrets/POSTGRES_DB
@@ -39,7 +38,7 @@ external_secrets:
 ---
 name: fleet
 working_dir: compose/fleet
-profiles: []
+profiles: [app]
 timeout: 10m # fleet prepare db can take a while on a large database
 external_secrets:
   MYSQL_ROOT_PASSWORD: op://Homelab/Fleet Secrets/MYSQL_ROOT_PASSWORD
