@@ -58,7 +58,7 @@ services:
     restart: "no"
 
   authentik-server:
-    image: ghcr.io/goauthentik/server:2026.8.5
+    image: ghcr.io/goauthentik/server:2025.10.1
     profiles: [app]
     command: server
     environment:
@@ -88,7 +88,7 @@ services:
       start_period: 300s
 
   authentik-worker:
-    image: ghcr.io/goauthentik/server:2026.8.5
+    image: ghcr.io/goauthentik/server:2025.10.1
     profiles: [app]
     command: worker
     environment:
