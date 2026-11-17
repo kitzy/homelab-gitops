@@ -54,7 +54,7 @@ working_dir: compose/backup
 # Gates the cd.doco.job.* schedules. Set to "true" once the restore is done,
 # the restic repository is initialized, and the Healthchecks.io checks exist.
 environment:
-  BACKUP_JOBS_ENABLED: "false"
+  BACKUP_JOBS_ENABLED: "true"
 external_secrets:
   FLEET_MYSQL_ROOT_PASSWORD: op://Homelab/Fleet Secrets/MYSQL_ROOT_PASSWORD
   AUTHENTIK_PG_DB: op://Homelab/authentik-secrets/POSTGRES_DB
