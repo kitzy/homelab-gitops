@@ -1,4 +1,5 @@
-# Authentik: server, worker, and Postgres. Ported from kubernetes/apps/authentik.
+# Authentik: server, worker, and Postgres. Ported from the retired K3s manifests
+# (kubernetes/apps/authentik, now only in git history).
 #
 # Changes from the K8s version:
 # - The nginx TLS sidecar and the cert-manager certificate are gone.

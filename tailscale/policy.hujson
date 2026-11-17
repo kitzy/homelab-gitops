@@ -6,7 +6,6 @@
 //     explicit grants below, not blanket autogroup:self.
 //   - Personal devices (laptop, phone) stay untagged under your account =
 //     autogroup:member.
-//   - The Kubernetes operator/proxies (tag:k8s*) and CI (tag:ci) are unchanged.
 //
 // Device -> tag mapping (apply with `tailscale up --advertise-tags=...`; see
 // tailscale/README.md):
@@ -44,13 +43,13 @@
 		},
 
 		// ---- Subnet routes & exit nodes ---------------------------------------
-		// Reach the physical LANs advertised by the routers. 10.253.20.0/24 is
-		// also where the cluster's MetalLB/Traefik LoadBalancer IPs live.
+		// Reach the physical LANs advertised by the routers. 10.253.20.0/24 holds
+		// the Synology (10.253.20.10).
 		{
 			"src": ["autogroup:member"],
 			"dst": [
 				"10.253.1.0/24",   // woolston-gateway
-				"10.253.20.0/24",  // woolston-gateway (cluster LAN / MetalLB)
+				"10.253.20.0/24",  // woolston-gateway (server LAN, Synology)
 				"10.253.30.0/24",  // woolston-gateway
 				"10.54.1.0/24",    // somerset-pi
 				"10.113.1.0/24",   // middlesex-pi
@@ -63,28 +62,6 @@
 			"src": ["autogroup:member"],
 			"dst": ["autogroup:internet"],
 			"ip":  ["*"],
-		},
-
-		// ---- Kubernetes -------------------------------------------------------
-		// CI (Flux reconcile) reaches only the K8s API.
-		{
-			"src": ["tag:ci"],
-			"dst": ["tag:k8s"],
-			"ip":  ["tcp:6443"],
-		},
-		// The API-server LoadBalancer proxy forwards to the control-plane nodes'
-		// tailnet IPs on 6443 (Endpoints hardcoded in k8s-api-service.yaml).
-		// Referenced by IP so it's independent of those nodes' tags/ownership.
-		{
-			"src": ["tag:k8s"],
-			"dst": ["100.115.235.1", "100.106.127.19", "100.77.140.69"],
-			"ip":  ["tcp:6443"],
-		},
-		// You reach the Tailscale-ingress web UIs (443) and the API (6443).
-		{
-			"src": ["autogroup:member"],
-			"dst": ["tag:k8s"],
-			"ip":  ["tcp:443", "tcp:6443"],
 		},
 
 		// ---- Vultr VPS (homelab-vps) ------------------------------------------
@@ -148,24 +125,14 @@
 	],
 
 	"tagOwners": {
-		"tag:k8s-operator": [],
-		"tag:k8s":          ["tag:k8s-operator"],
-		"tag:ci":           ["autogroup:admin"],
 		"tag:server":       ["autogroup:admin"],
 		"tag:mgmt":         ["autogroup:admin"],
 		"tag:router":       ["autogroup:admin"],
 		"tag:vps":          ["autogroup:admin"],
 	},
 
-	// Regression guard. Asserts CI keeps API access and stays contained — it
-	// must not reach the k8s web port, server SSH, or the KVM console. Runs on
-	// every save/apply.
+	// Regression guards. Run on every save/apply.
 	"tests": [
-		{
-			"src":    "tag:ci",
-			"accept": ["tag:k8s:6443"],
-			"deny":   ["tag:k8s:443", "tag:server:22", "tag:mgmt:443"],
-		},
 		// The VPS reaches only the NAS over SSH (restic SFTP). A compromised VM
 		// must not reach the hypervisors, the KVM, or other NAS services.
 		{
