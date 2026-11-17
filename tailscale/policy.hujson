@@ -14,6 +14,7 @@
 //   tag:mgmt    -> glkvm   (out-of-band KVM)
 //   tag:router  -> somerset-pi, woolston-gateway, middlesex-pi, piscataway-pi
 //                  (subnet routers + exit nodes)
+//   tag:vps     -> homelab-vps (Vultr VM running the Compose stacks)
 //
 // Everything not granted below is denied.
 {
@@ -86,6 +87,23 @@
 			"ip":  ["tcp:443", "tcp:6443"],
 		},
 
+		// ---- Vultr VPS (homelab-vps) ------------------------------------------
+		// You reach the VM over Tailscale SSH, and HTTPS 443 for any
+		// tailnet-only web UI served on it.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:vps"],
+			"ip":  ["tcp:22", "tcp:443"],
+		},
+		// restic backups go over SFTP to the Synology, reached through the
+		// woolston-gateway subnet route. SSH to the NAS only, nothing else.
+		// The VM must run `tailscale up --accept-routes` to use the route.
+		{
+			"src": ["tag:vps"],
+			"dst": ["10.253.20.10"],
+			"ip":  ["tcp:22"],
+		},
+
 		// ---- Personal devices -------------------------------------------------
 		// Your own untagged devices keep full connectivity to each other. Tagged
 		// infra is NOT covered by autogroup:self, so this doesn't re-open it.
@@ -124,7 +142,7 @@
 		{
 			"action": "check",
 			"src":    ["autogroup:member"],
-			"dst":    ["tag:server", "tag:mgmt", "tag:router"],
+			"dst":    ["tag:server", "tag:mgmt", "tag:router", "tag:vps"],
 			"users":  ["autogroup:nonroot", "root"],
 		},
 	],
@@ -136,6 +154,7 @@
 		"tag:server":       ["autogroup:admin"],
 		"tag:mgmt":         ["autogroup:admin"],
 		"tag:router":       ["autogroup:admin"],
+		"tag:vps":          ["autogroup:admin"],
 	},
 
 	// Regression guard. Asserts CI keeps API access and stays contained — it
@@ -146,6 +165,18 @@
 			"src":    "tag:ci",
 			"accept": ["tag:k8s:6443"],
 			"deny":   ["tag:k8s:443", "tag:server:22", "tag:mgmt:443"],
+		},
+		// The VPS reaches only the NAS over SSH (restic SFTP). A compromised VM
+		// must not reach the hypervisors, the KVM, or other NAS services.
+		{
+			"src":    "tag:vps",
+			"accept": ["10.253.20.10:22"],
+			"deny":   ["tag:server:22", "tag:mgmt:22", "10.253.20.10:443"],
+		},
+		// Nothing on the LAN side needs to reach the VPS.
+		{
+			"src":  "tag:server",
+			"deny": ["tag:vps:22", "tag:vps:443"],
 		},
 	],
 }
