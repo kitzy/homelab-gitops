@@ -13,10 +13,6 @@
 #   OR check the Cloudflare Zero Trust dashboard
 
 tunnels:
-  homelab-k3s:
-    tunnel_id: "a80b484c-d2e9-484b-bf01-ba385ee9be7e"
-    description: "Homelab Kubernetes cluster tunnel for exposing internal services"
-    ca_pool: "/etc/cloudflared/certs/ca.crt"
   homelab-vps:
     # Created by hand in Cloudflare Zero Trust. Its token is in 1Password
     # (Homelab / Cloudflare Tunnel / VPS_TUNNEL_TOKEN). Plain HTTP to the
