@@ -45,7 +45,7 @@ jobs:
           TF_API_TOKEN: op://GitHub/Terraform Cloud/credential
           TS_OAUTH_CLIENT_ID: op://GitHub/Tailscale ACL/OAUTH_CLIENT_ID
           TS_OAUTH_SECRET: op://GitHub/Tailscale ACL/OAUTH_SECRET
-          VULTR_API_KEY: op://GitHub/Vultr API/credential
+          VULTR_API_KEY: op://GitHub/Vultr API Key/credential
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
