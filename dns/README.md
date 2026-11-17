@@ -97,7 +97,7 @@ The multi-provider format enables **zero-downtime migrations**:
 
 ## 🚇 Cloudflare Tunnels
 
-Cloudflare Tunnels allow you to securely expose internal services (like Kubernetes clusters, private servers, or localhost) to the internet without opening inbound ports. This repository supports managing tunnel DNS records and routing configurations directly in your zone files.
+Cloudflare Tunnels allow you to securely expose internal services (like Docker hosts, private servers, or localhost) to the internet without opening inbound ports. This repository supports managing tunnel DNS records and routing configurations directly in your zone files.
 
 ### Prerequisites
 

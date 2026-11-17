@@ -9,7 +9,7 @@
 //
 // Device -> tag mapping (apply with `tailscale up --advertise-tags=...`; see
 // tailscale/README.md):
-//   tag:server  -> pve1, pve2, homelab-01, nova
+//   tag:server  -> pve1, homelab-01, nova
 //   tag:mgmt    -> glkvm   (out-of-band KVM)
 //   tag:router  -> somerset-pi, woolston-gateway, middlesex-pi, piscataway-pi
 //                  (subnet routers + exit nodes)
