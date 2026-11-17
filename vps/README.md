@@ -85,6 +85,62 @@ Doco-CD polls `main` every 3 minutes and deploys every stack in `.doco-cd.yml`.
 
 Edit the image tag in `/opt/doco-cd/compose.yaml` on the VM, then `docker compose up -d`. Keep [`terraform/cloud-init.yaml.tftpl`](terraform/cloud-init.yaml.tftpl) in sync so a rebuilt VM gets the same version.
 
+## Stacks
+
+Each stack is a directory under [`compose/`](../compose/) and one document in [`.doco-cd.yml`](../.doco-cd.yml).
+
+| Stack | Services | Public via |
+| --- | --- | --- |
+| `edge` | `cloudflared` | (it is the tunnel) |
+| `authentik` | `authentik-db`, `authentik-media-perms` (one-shot), `authentik-server`, `authentik-worker` | `auth.kitzy.net` → `http://authentik-server:9000` |
+| `fleet` | `fleet-mysql`, `fleet-redis`, `fleet-volume-perms` (one-shot), `fleet-migrate` (one-shot), `fleet` | `fleet.kitzy.net` → `http://fleet:8080` |
+| `scanopy` | `scanopy-db`, `scanopy-server`, `scanopy-ts` (Tailscale sidecar) | tailnet only, `https://scanopy.tail26a1d8.ts.net` |
+
+Conventions:
+
+- Every image tag is pinned. Renovate covers `compose/*/compose.yaml` (see [`renovate.json`](../renovate.json)). It keeps MySQL on 8.0, Postgres on 17, and Redis on 7.
+- Named volumes only, with fixed names (`fleet_mysql`, `authentik_pgdata`, ...). No bind mounts from the repo: Doco-CD runs in a container, so a relative path would resolve somewhere the Docker daemon cannot see. Config files use `configs` with inline `content`.
+- `proxy` is an external network created by cloud-init. Only cloudflared and the apps' HTTP services join it. Databases stay on each stack's own network (`authentik-backend`, `fleet-backend`, `scanopy-backend`), which have fixed names so the backup stack can join them.
+- Healthchecks on every long-running service. `depends_on` waits for `service_healthy`, or `service_completed_successfully` for one-shots.
+- `restart: unless-stopped`. Log rotation comes from `daemon.json`.
+- `mem_limit` on every service as a safety net:
+
+  | Service | Limit |
+  | --- | --- |
+  | authentik-server | 3 GB |
+  | authentik-worker | 768 MB |
+  | authentik-db | 512 MB |
+  | fleet | 2 GB |
+  | fleet-mysql | 2 GB (buffer pool 1 GB) |
+  | fleet-redis | 256 MB |
+  | scanopy-server | 512 MB |
+  | scanopy-db | 384 MB |
+  | cloudflared, scanopy-ts | 192 MB |
+  | doco-cd | 256 MB (the 1Password provider raises its memory use) |
+
+  Check `docker stats` in the first week. If use stays above about 6.5 GB, move to the 16 GB plan (about $81 a month) by changing `plan` in [`terraform/variables.tf`](terraform/variables.tf). A plan resize is an in-place change on Vultr. Read the Terraform plan before merging to make sure it says update, not replace.
+
+### Profiles: staged first deploy
+
+Services without a profile always run. Everything except the databases (and cloudflared) is in the `app` profile. `.doco-cd.yml` starts with `profiles: []`, so the first deploy brings up only the databases. Restore the old dumps into them, then a follow-up PR sets `profiles: [app]`. Restoring before the apps start matters: an app that boots first runs its migrations on an empty database, and the restore then collides with them.
+
+### 1Password items
+
+Doco-CD reads these from the `Homelab` vault. The 1Password provider has no bulk fetch, so every field is listed in `.doco-cd.yml`. A deploy fails if any reference is missing, even for services in an inactive profile, so all of these must exist before the first deploy.
+
+| Item | Fields | Status |
+| --- | --- | --- |
+| `authentik-secrets` | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `AUTHENTIK_SECRET_KEY`, `AUTHENTIK_HOST`, `AUTHENTIK_COOKIE_DOMAIN` | exists |
+| `Fleet Secrets` | `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `FLEET_SERVER_PRIVATE_KEY`, `FLEET_LICENSE_KEY`, `FLEET_S3_SOFTWARE_INSTALLERS_BUCKET`, `FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID`, `FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY` | exists |
+| `Scanopy Secrets` | `POSTGRES_PASSWORD` | exists |
+| `Cloudflare Tunnel` | `VPS_TUNNEL_TOKEN` (new field, token of the new `homelab-vps` tunnel; the old `TUNNEL_TOKEN` stays for rollback) | **create** |
+| `Scanopy Tailscale` | `credential`: a reusable=false, pre-authorized, `tag:vps` auth key | **create** |
+
+Creating the two new items:
+
+1. Tunnel: Cloudflare Zero Trust, Networks, Tunnels, create a Cloudflared tunnel named `homelab-vps`. Copy its token into a new `VPS_TUNNEL_TOKEN` field on `Cloudflare Tunnel`, and note the tunnel ID for the DNS PR. Do not add public hostnames in the dashboard. The `dns/` Terraform manages them.
+2. Scanopy key: in the Tailscale admin console, first delete the old `scanopy` device (the K8s ingress proxy), or the new node registers as `scanopy-1` and the URL changes. Then generate an auth key: not reusable, pre-authorized, tag `tag:vps`. Store it as an API Credential item `Scanopy Tailscale` in `Homelab`, with the key in `credential`. The sidecar uses it once and keeps its node state in the `scanopy_ts_state` volume.
+
 ## Security notes
 
 - Doco-CD mounts the Docker socket, which is root-equivalent on the VM. The 1Password token also lives on the VM. Keep the service account scoped to one vault, read-only.
