@@ -5,11 +5,37 @@ data "vultr_os" "ubuntu" {
   }
 }
 
-# No inbound rules. A Vultr firewall group with no rules drops all inbound
-# traffic. Egress is open. Admin access is Tailscale SSH and public traffic
-# arrives through the Cloudflare Tunnel, both outbound connections.
+# Inbound: only Tailscale's direct-connection port. Egress is open. Admin
+# access is Tailscale SSH and public traffic arrives through the Cloudflare
+# Tunnel, both outbound connections.
+#
+# A Vultr firewall group with NO rules allows everything (found 2026-11-17:
+# public port 22 was reachable). It drops unmatched traffic only once it has
+# at least one rule, so these rules are what make the group default-deny.
 resource "vultr_firewall_group" "vps" {
   description = "${var.hostname}: no inbound"
+}
+
+# UDP 41641 lets Tailscale peers connect directly instead of through a DERP
+# relay. Tailscale traffic is authenticated and encrypted end to end.
+resource "vultr_firewall_rule" "tailscale_v4" {
+  firewall_group_id = vultr_firewall_group.vps.id
+  protocol          = "udp"
+  ip_type           = "v4"
+  subnet            = "0.0.0.0"
+  subnet_size       = 0
+  port              = "41641"
+  notes             = "Tailscale direct connections"
+}
+
+resource "vultr_firewall_rule" "tailscale_v6" {
+  firewall_group_id = vultr_firewall_group.vps.id
+  protocol          = "udp"
+  ip_type           = "v6"
+  subnet            = "::"
+  subnet_size       = 0
+  port              = "41641"
+  notes             = "Tailscale direct connections"
 }
 
 # Single-use, pre-authorized key that joins the VM to the tailnet as tag:vps.

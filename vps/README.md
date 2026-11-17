@@ -15,7 +15,7 @@ One Vultr VM runs Authentik and Fleet as Docker Compose stacks. [Doco-CD](https:
 ## The VM
 
 - Vultr High Performance, plan `vhp-4c-8gb-amd` (4 vCPU, 8 GB, 180 GB NVMe), region `ewr` (New Jersey), Ubuntu 24.04. About $48 a month.
-- Firewall group with no inbound rules. Everything the VM does is outbound: Tailscale, the Cloudflare Tunnel, Doco-CD polling GitHub, restic to the NAS.
+- Firewall group that allows only UDP 41641 inbound (Tailscale direct connections). A Vultr firewall group with no rules allows everything, so that one rule is what makes it drop the rest. `sshd` is disabled; admin access is Tailscale SSH. Everything else the VM does is outbound: the Cloudflare Tunnel, Doco-CD polling GitHub, restic to the NAS.
 - Cloud-init installs Docker (with log rotation) and Tailscale, adds a 4 GB swap file, enables unattended security upgrades, joins the tailnet as `homelab-vps` with `tag:vps`, creates the `proxy` Docker network, and writes `/opt/doco-cd/compose.yaml`. It does not start Doco-CD.
 - `prevent_destroy` is set on the instance. Every Docker volume, so every database, lives on the VM disk. A replace would destroy them. Terraform also ignores changes to `user_data` and `os_id`, so editing cloud-init never forces a replace. Cloud-init changes only apply to a newly built VM.
 - Optional, off by default: Vultr automatic backups (`enable_vultr_backups`) and a block storage volume for `/var/lib/docker` (`docker_volume_size_gb`). The volume only takes effect when the VM is first created.
@@ -57,7 +57,7 @@ tailscale status | grep homelab-vps
 ssh root@homelab-vps 'cloud-init status --long; docker version --format "{{.Server.Version}}"; swapon --show; docker network ls | grep proxy'
 ```
 
-To confirm no public ports are open, scan the public IP (Terraform output `public_ipv4`) from outside the tailnet. Every port should be filtered.
+To confirm no public ports are open, scan the public IP (Terraform output `public_ipv4`) from outside the tailnet. Every TCP port should be filtered.
 
 ## Bootstrap Doco-CD
 
