@@ -79,7 +79,7 @@ services:
     restart: "no"
 
   fleet-migrate:
-    image: fleetdm/fleet:v4.95.0
+    image: fleetdm/fleet:v4.95.0@sha256:14fe5700b07b448131f87d27480e37005e0943f4a9af8fa3cab2b2fe4988459d
     profiles: [app]
     command: ["fleet", "prepare", "db", "--no-prompt"]
     environment:
@@ -90,7 +90,7 @@ services:
     restart: "no"
 
   fleet:
-    image: fleetdm/fleet:v4.95.0
+    image: fleetdm/fleet:v4.95.0@sha256:14fe5700b07b448131f87d27480e37005e0943f4a9af8fa3cab2b2fe4988459d
     profiles: [app]
     command: ["fleet", "serve"]
     environment:
