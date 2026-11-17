@@ -33,7 +33,7 @@ The existing `Terraform Cloud` item in the 1Password `GitHub` vault already hold
 ### 2. Vultr API key
 
 1. In the Vultr portal, Account, API, enable the API and copy the key.
-2. Store it in the 1Password `GitHub` vault as an API Credential item named `Vultr API`, with the key in the `credential` field. The workflow reads `op://GitHub/Vultr API/credential`.
+2. Store it in the 1Password `GitHub` vault as an API Credential item named `Vultr API Key`, with the key in the `credential` field. The workflow reads `op://GitHub/Vultr API Key/credential`. It must be in the `GitHub` vault, the only vault the GitHub Actions service account can read.
 3. Access control: Vultr API keys have an IP allowlist. GitHub-hosted runners use changing IPs, so the allowlist has to allow any IPv4 (`0.0.0.0/0`) and IPv6 (`::/0`).
 
 > **Risk:** with an open allowlist, anyone who gets the key can manage the whole Vultr account, including deleting the VM. The key lives only in 1Password and in masked CI env vars. Rotate it if it leaks. The fix is a self-hosted runner with a fixed IP (for example on the VM itself, over Tailscale), which is not set up.
