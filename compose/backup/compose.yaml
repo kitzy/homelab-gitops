@@ -1,0 +1,233 @@
+# Nightly backups for homelab-vps.
+#
+#   02:00  dump-fleet      mysqldump of Fleet, verified (>= 100 tables, core tables present)
+#   02:10  dump-authentik  pg_dump of Authentik
+#   03:00  restic-backup   checks both dumps are fresh, snapshots the dumps
+#                          and the Authentik media volume to the Synology over
+#                          SFTP, then applies retention (7 daily, 4 weekly,
+#                          3 monthly) and prunes. Creates the repository on its
+#                          first run.
+#   Sun 05:00  restic-check  `restic check` on the repository
+#
+# Times are America/New_York (the TZ of the Doco-CD container).
+#
+# The jobs are scheduled by Doco-CD's built-in job scheduler (the cd.doco.job.*
+# labels), not host cron. On deploy the containers are created but not
+# started. They run only when their schedule fires. Job containers exit when
+# done, so they have no healthcheck. Healthchecks.io alerts if a run fails
+# or never happens.
+#
+# The scripts live in `command`, not in Compose `configs`: configs are only
+# injected when Compose starts a container, while a command is part of the
+# container itself. That keeps `docker start -a backup-<job>-1` (a manual run)
+# and vps/restic-adhoc.sh working.
+#
+# Dumps land in the `backup_dumps` volume as plain SQL, one file per database,
+# overwritten each night. restic keeps the history and deduplicates.
+#
+# BACKUP_JOBS_ENABLED (set in .doco-cd.yml) gates the schedules. It stays
+# "false" until the databases are restored.
+#
+# Secrets (from 1Password through .doco-cd.yml):
+#   FLEET_MYSQL_ROOT_PASSWORD, AUTHENTIK_PG_DB, AUTHENTIK_PG_USER,
+#   AUTHENTIK_PG_PASSWORD, RESTIC_PASSWORD,
+#   RESTIC_SSH_KEY_B64, HC_BACKUP_URL, HC_CHECK_URL
+
+x-job: &job
+  restart: "no"
+  mem_limit: 512m
+
+x-restic-env: &restic-env
+  # SFTP to the Synology through the Tailscale subnet route, via the `nas`
+  # host alias set up by the script below. Synology chroots SFTP users to the
+  # shared-folder root, so the path starts at the share name, not /volume1.
+  RESTIC_REPOSITORY: sftp:nas:/backups/homelab-vps
+  RESTIC_PASSWORD: ${RESTIC_PASSWORD:?RESTIC_PASSWORD is required}
+  RESTIC_SSH_KEY_B64: ${RESTIC_SSH_KEY_B64:?RESTIC_SSH_KEY_B64 is required}
+  RESTIC_CACHE_DIR: /cache
+  RESTIC_HOST: homelab-vps
+  # Synology host key (ED25519), pinned. Same key as the NAS entry already in
+  # the admin's known_hosts.
+  RESTIC_NAS_KNOWN_HOSTS: 10.253.20.10 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAtIqhLXVxhXsuBKK0MXa3Px4ujuw6tkkwg95s+t4cyH
+
+# One script for both restic jobs; RESTIC_JOB picks backup or check.
+# vps/restic-adhoc.sh repeats the SSH setup part. Keep the two in sync.
+x-restic-script: &restic-script
+  - |
+    set -u
+    mkdir -p "$$HOME/.ssh" && chmod 700 "$$HOME/.ssh"
+    printf '%s' "$$RESTIC_SSH_KEY_B64" | base64 -d > "$$HOME/.ssh/id_restic"
+    printf '%s\n' "$$RESTIC_NAS_KNOWN_HOSTS" > "$$HOME/.ssh/known_hosts_nas"
+    chmod 600 "$$HOME/.ssh/id_restic"
+    printf 'Host nas\n  HostName 10.253.20.10\n  User restic\n  IdentityFile ~/.ssh/id_restic\n  IdentitiesOnly yes\n  UserKnownHostsFile ~/.ssh/known_hosts_nas\n  StrictHostKeyChecking yes\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' > "$$HOME/.ssh/config"
+
+    hc_ping() {
+      wget -q -T 10 -O /dev/null "$${HC_URL}$${1}" || echo "WARN: Healthchecks ping '$$1' failed"
+    }
+
+    # `set -e` does not apply inside a function called from `if`, so every
+    # step checks its own exit code.
+    backup() {
+      # First run: create the repository. restic exits 10 only when the
+      # repository does not exist, so a network or auth error never triggers
+      # an init, and init itself refuses to overwrite an existing repo.
+      restic cat config >/dev/null 2>&1
+      rc=$$?
+      if [ "$$rc" -eq 10 ]; then
+        echo "Repository not found, initializing it"
+        restic init || return 1
+      elif [ "$$rc" -ne 0 ]; then
+        echo "ERROR: cannot open the repository (restic exit $$rc):"
+        restic cat config >/dev/null
+        return 1
+      fi
+      for db in fleet authentik; do
+        f="/dumps/$$db.sql"
+        if [ ! -s "$$f" ]; then echo "ERROR: $$f is missing"; return 1; fi
+        if [ -z "$$(find "$$f" -mmin -180)" ]; then
+          echo "ERROR: $$f is more than 3 hours old. Tonight's $$db dump failed; check its job log."
+          return 1
+        fi
+      done
+      restic backup --host "$$RESTIC_HOST" --tag nightly /dumps /data/authentik_media || return 1
+      restic forget --host "$$RESTIC_HOST" --keep-daily 7 --keep-weekly 4 --keep-monthly 3 --prune || return 1
+      restic snapshots --host "$$RESTIC_HOST" --latest 1 || return 1
+    }
+
+    check() {
+      restic check
+    }
+
+    hc_ping /start
+    if "$$RESTIC_JOB"; then
+      hc_ping ""
+    else
+      hc_ping /fail
+      exit 1
+    fi
+
+x-pg-dump-script: &pg-dump-script
+  - |
+    set -eu
+    out="/dumps/$${DUMP_NAME}.sql"
+    tmp="$$out.tmp"
+    echo "Dumping $$PGDATABASE on $$PGHOST to $$out"
+    if ! pg_dump --format=plain "$$PGDATABASE" > "$$tmp"; then
+      rm -f "$$tmp"; exit 1
+    fi
+    # pg_dump writes this footer only when it finishes. pg_dump 17.6+ adds
+    # `unrestrict` lines after it, so look at the last 20 lines.
+    if ! tail -n 20 "$$tmp" | grep -q "PostgreSQL database dump complete"; then
+      echo "ERROR: dump is incomplete"
+      rm -f "$$tmp"; exit 1
+    fi
+    mv "$$tmp" "$$out"
+    echo "$$DUMP_NAME dump OK: $$(du -h "$$out" | cut -f1)"
+
+services:
+  dump-fleet:
+    <<: *job
+    # Oracle's mysqldump. MariaDB's client can fail against MySQL 8 auth.
+    image: mysql:8.0.46
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        out=/dumps/fleet.sql
+        tmp="$$out.tmp"
+        echo "Dumping Fleet MySQL to $$out"
+        mysqldump --host=fleet-mysql --user=root \
+          --single-transaction --routines --triggers --events \
+          fleet > "$$tmp"
+
+        # Same checks as the old K8s CronJob. A dump that fails them is
+        # deleted and the job fails, so the last good dump stays in place and
+        # the restic job sees it is stale.
+        tables=$$(grep -c "^-- Table structure for table" "$$tmp" || true)
+        if [ "$$tables" -lt 100 ]; then
+          echo "ERROR: only $$tables tables in the dump (expected 100+)"
+          rm -f "$$tmp"; exit 1
+        fi
+        for t in users migration_status_tables hosts; do
+          if ! grep -q "Table structure for table \`$${t}\`" "$$tmp"; then
+            echo "ERROR: dump is missing table $$t"
+            rm -f "$$tmp"; exit 1
+          fi
+        done
+        mv "$$tmp" "$$out"
+        echo "Fleet dump OK: $$tables tables, $$(du -h "$$out" | cut -f1)"
+    environment:
+      MYSQL_PWD: ${FLEET_MYSQL_ROOT_PASSWORD:?FLEET_MYSQL_ROOT_PASSWORD is required}
+    volumes:
+      - backup_dumps:/dumps
+    networks: [fleet-backend]
+    labels:
+      cd.doco.job.enabled: "${BACKUP_JOBS_ENABLED:-false}"
+      cd.doco.job.schedule: "0 2 * * *"
+
+  dump-authentik:
+    <<: *job
+    image: postgres:17.12-alpine
+    entrypoint: ["sh", "-c"]
+    command: *pg-dump-script
+    environment:
+      DUMP_NAME: authentik
+      PGHOST: authentik-db
+      PGDATABASE: ${AUTHENTIK_PG_DB:?AUTHENTIK_PG_DB is required}
+      PGUSER: ${AUTHENTIK_PG_USER:?AUTHENTIK_PG_USER is required}
+      PGPASSWORD: ${AUTHENTIK_PG_PASSWORD:?AUTHENTIK_PG_PASSWORD is required}
+    volumes:
+      - backup_dumps:/dumps
+    networks: [authentik-backend]
+    labels:
+      cd.doco.job.enabled: "${BACKUP_JOBS_ENABLED:-false}"
+      cd.doco.job.schedule: "10 2 * * *"
+
+  restic-backup:
+    <<: *job
+    image: restic/restic:0.19.1
+    entrypoint: ["sh", "-c"]
+    command: *restic-script
+    environment:
+      <<: *restic-env
+      RESTIC_JOB: backup
+      HC_URL: ${HC_BACKUP_URL:?HC_BACKUP_URL is required}
+    volumes:
+      - backup_dumps:/dumps:ro
+      - authentik_media:/data/authentik_media:ro
+      - restic_cache:/cache
+    labels:
+      cd.doco.job.enabled: "${BACKUP_JOBS_ENABLED:-false}"
+      cd.doco.job.schedule: "0 3 * * *"
+
+  restic-check:
+    <<: *job
+    image: restic/restic:0.19.1
+    entrypoint: ["sh", "-c"]
+    command: *restic-script
+    environment:
+      <<: *restic-env
+      RESTIC_JOB: check
+      HC_URL: ${HC_CHECK_URL:?HC_CHECK_URL is required}
+    volumes:
+      - restic_cache:/cache
+    labels:
+      cd.doco.job.enabled: "${BACKUP_JOBS_ENABLED:-false}"
+      cd.doco.job.schedule: "0 5 * * 0"
+
+networks:
+  # The app stacks' private networks, so the dump jobs reach the databases.
+  fleet-backend:
+    external: true
+  authentik-backend:
+    external: true
+
+volumes:
+  backup_dumps:
+    name: backup_dumps
+  # Owned by the authentik stack. Mounted read-only here.
+  authentik_media:
+    external: true
+    name: authentik_media
+  restic_cache:
+    name: restic_cache

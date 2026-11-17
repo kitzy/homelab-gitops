@@ -113,7 +113,7 @@ Conventions:
   | fleet-mysql | 2 GB (buffer pool 1 GB) |
   | fleet-redis | 256 MB |
   | cloudflared | 192 MB |
-  | doco-cd | 256 MB (the 1Password provider raises its memory use) |
+  | doco-cd | 512 MB (measured ~210 MB while deploying; the 1Password provider raises its memory use) |
 
   Check `docker stats` in the first week. If use stays above about 6.5 GB, move to the 16 GB plan (about $81 a month) by changing `plan` in [`terraform/variables.tf`](terraform/variables.tf). A plan resize is an in-place change on Vultr. Read the Terraform plan before merging to make sure it says update, not replace.
 
@@ -132,6 +132,77 @@ Doco-CD reads these from the `Homelab` vault. The 1Password provider has no bulk
 | `Cloudflare Tunnel` | `VPS_TUNNEL_TOKEN` (new field, token of the new `homelab-vps` tunnel; the old `TUNNEL_TOKEN` stays for rollback) | **create** |
 
 To create the tunnel token: in Cloudflare Zero Trust, Networks, Tunnels, create a Cloudflared tunnel named `homelab-vps`. Copy its token into a new `VPS_TUNNEL_TOKEN` field on `Cloudflare Tunnel`, and note the tunnel ID for the DNS PR. Do not add public hostnames in the dashboard. The `dns/` Terraform manages them.
+
+## Backups
+
+The `backup` stack ([`compose/backup/compose.yaml`](../compose/backup/compose.yaml)) runs nightly jobs through Doco-CD's built-in scheduler (`cd.doco.job.*` labels). No host cron is used. Times are America/New_York.
+
+| Time | Job | What it does |
+| --- | --- | --- |
+| 02:00 | `dump-fleet` | `mysqldump` (Oracle client, `mysql:8.0.46`) of `fleet`. Fails and deletes the dump unless it has at least 100 tables and includes `users`, `migration_status_tables`, and `hosts`. |
+| 02:10 | `dump-authentik` | `pg_dump` 17, plain format. Fails unless the dump has pg_dump's completion footer. |
+| 03:00 | `restic-backup` | Fails if any dump is missing or more than 3 hours old. Otherwise it snapshots `backup_dumps` and the `authentik_media` volume, then runs `forget --keep-daily 7 --keep-weekly 4 --keep-monthly 3 --prune`. |
+| Sun 05:00 | `restic-check` | `restic check`. |
+
+The restic jobs ping Healthchecks.io on start, success, and failure. A dump job that fails leaves the previous dump in place, so the restic job sees a stale file and pings `/fail`. If Doco-CD or the VM is down, nothing pings, and Healthchecks.io alerts on the missed schedule.
+
+This fixes two gaps in the K8s setup: Authentik dumps are now pruned (retention applies to every snapshot), and the Authentik media volume is backed up. The Fleet vulndb is not backed up, because Fleet rebuilds it.
+
+Repository: `sftp:restic@10.253.20.10:/backups/homelab-vps`, reached over the Tailscale subnet route (`tag:vps` may reach only `10.253.20.10:22`). The NAS host key is pinned in the compose file.
+
+`BACKUP_JOBS_ENABLED` in `.doco-cd.yml` gates the schedules. It stays `"false"` until the steps below are done.
+
+### Setup
+
+1. **NAS user.** [`nas-restic-setup.sh`](nas-restic-setup.sh) creates the `restic` user (key auth only), a `backups` shared folder on `/volume2` (read/write for `restic` and administrators), `backups/homelab-vps`, `~restic/.ssh/authorized_keys` with the restic public key, and turns on SFTP (it was off). It needs root, so run it with your sudo password:
+
+    ```bash
+    ssh admin@10.253.20.10 'cat > /tmp/nas-restic-setup.sh' < vps/nas-restic-setup.sh
+    ```
+
+    ```bash
+    ssh -t admin@10.253.20.10 'sudo sh /tmp/nas-restic-setup.sh; rm -f /tmp/nas-restic-setup.sh'
+    ```
+
+    (`scp` does not work until SFTP is on.) Afterwards, in DSM, check that `restic` has no access to any other shared folder. DSM chroots SFTP users to the shared-folder root, so the repository path is `/backups/homelab-vps`.
+2. **Key and password.** On your Mac, generate the SSH key and the restic password, and store them in 1Password (`Homelab` vault, item `restic homelab-vps`). The private key is stored base64-encoded on one line, so it survives being an env var:
+
+    ```bash
+    d=$(mktemp -d) && ssh-keygen -q -t ed25519 -N "" -C restic@homelab-vps -f "$d/id" && op item create --vault Homelab --category password --title "restic homelab-vps" --generate-password='letters,digits,32' "ssh_private_key_b64[concealed]=$(base64 < "$d/id" | tr -d '\n')" "ssh_public_key[text]=$(cat "$d/id.pub")" >/dev/null && cat "$d/id.pub" && rm -rf "$d"
+    ```
+
+    The item `restic homelab-vps` already exists (created 2026-11-17). Its public key is the one in `nas-restic-setup.sh`. If you ever regenerate the key, update the script and re-run it.
+3. **Healthchecks.io.** Create two checks: `homelab-vps backup` (daily, 03:00 America/New_York, grace 2 hours) and `homelab-vps restic check` (weekly, Sunday 05:00, grace 6 hours). Store their ping URLs in a `Homelab` item `Healthchecks homelab-vps`, fields `backup_ping_url` and `check_ping_url`.
+4. **Run each job once by hand** after the databases are restored and the backup stack has deployed. The first `restic-backup` run creates the repository (it initializes only when restic reports that no repository exists, never on a connection or auth error):
+
+    ```bash
+    ssh root@homelab-vps 'for j in dump-fleet dump-authentik restic-backup restic-check; do echo "== $j"; docker start -a backup-$j-1 || break; done'
+    ```
+
+    The job scripts live in each container's `command`, so `docker start -a` runs exactly what the scheduler runs. Container names follow Compose's `<project>-<service>-1`. List them with `docker ps -a --filter label=com.docker.compose.project=backup`.
+5. Set `BACKUP_JOBS_ENABLED: "true"` in `.doco-cd.yml` and merge. Check the next morning that both Healthchecks.io checks are green.
+
+### Ad-hoc restic commands
+
+[`restic-adhoc.sh`](restic-adhoc.sh) runs any restic command against the repository. It reads the settings and key from the stopped `restic-backup` job container, so nothing secret stays on the host:
+
+```bash
+ssh root@homelab-vps 'bash -s -- snapshots' < vps/restic-adhoc.sh
+```
+
+### Restore drill
+
+Restore the latest snapshot to `/root/restore-drill` and compare it with the live data:
+
+```bash
+ssh root@homelab-vps 'bash -s -- restore latest --target /restore' < vps/restic-adhoc.sh
+```
+
+Then load `/root/restore-drill/dumps/*.sql` into throwaway database containers and spot-check them (for Fleet, the table count and `SELECT COUNT(*) FROM hosts`). Delete `/root/restore-drill` afterwards.
+
+### Later hardening
+
+Run `rest-server --append-only` on the NAS (Container Manager) and point restic at it. A compromised VM then cannot delete backups. Pruning moves to a trusted job on the NAS.
 
 ## Security notes
 
