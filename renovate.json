@@ -7,12 +7,19 @@
   },
   "packageRules": [
     {
-      "description": "Fleet stable (vX.Y.Z) and RC (rc-minor-fleet-vX.Y.Z / rc-patch-fleet-vX.Y.Z) tags. RCs count as prereleases of the same version, so the newest of either is proposed, and a stable release supersedes its RC. RC tags are rebuilt in place, so digests are pinned to catch re-pushes.",
+      "description": "Everything except Fleet: stable releases only (no RC, beta, or other prerelease tags).",
+      "matchManagers": ["docker-compose"],
+      "matchPackageNames": ["!fleetdm/fleet"],
+      "ignoreUnstable": true
+    },
+    {
+      "description": "Fleet follows the release-candidate channel: the newest of stable (vX.Y.Z) and RC (rc-minor-fleet-vX.Y.Z / rc-patch-fleet-vX.Y.Z) tags. RCs count as prereleases of the same version, so a stable release supersedes its own RC. Docker Hub's `latest` tag follows stable only, so respectLatest is off or it would cap updates at the latest stable and hide newer RCs. RC tags are rebuilt in place, so digests are pinned to catch re-pushes.",
       "matchManagers": ["docker-compose"],
       "matchPackageNames": ["fleetdm/fleet"],
       "enabled": true,
       "versioning": "regex:^(?:(?<prerelease>rc)-(?:minor|patch)-fleet-)?v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
       "ignoreUnstable": false,
+      "respectLatest": false,
       "pinDigests": true,
       "commitMessageTopic": "Fleet",
       "labels": ["fleet"]
