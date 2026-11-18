@@ -19,6 +19,9 @@ on:
     paths:
       - 'do/terraform/**'
       - '.github/workflows/do-terraform.yaml'
+  # Manual re-apply of main, e.g. to correct the database settings that
+  # DigitalOcean resets when a cluster is created (see databases.tf).
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -130,7 +133,7 @@ jobs:
         run: exit 1
 
       - name: Terraform apply
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         env:
           CLOUDFLARE_API_TOKEN: ${{ steps.op-secrets.outputs.CLOUDFLARE_API_TOKEN }}
           TF_VAR_cloudflare_account_id: ${{ steps.op-secrets.outputs.CLOUDFLARE_ACCOUNT_ID }}
