@@ -62,29 +62,14 @@ records:
       - "keybase-site-verification=t-u9Qz4iU7oOd4DMKH0FHW69b_Xo-oCXh7dTaPxmmb0"
       - "google-site-verification=RCPsMhka0hUhhhjWGMPboyjoMoFiNMMlyntpCQsjlvg"
       - "1password-site-verification=UFL2MKVZ6JABTLXTDKHM7ARGEQ"
-  # Cloudflare Tunnel records - route to the Compose stacks on homelab-vps.
-  # Service names resolve on the VM's `proxy` Docker network.
+  # DigitalOcean App Platform apps (do/terraform). DNS-only: a proxied
+  # record breaks App Platform's certificate renewal.
   - name: "auth"
-    type: TUNNEL
-    ttl: 300
-    tunnel:
-      name: "homelab-vps"
-      service: "http://authentik-server:9000"
-  - name: "fleet"
-    type: TUNNEL
-    ttl: 300
-    tunnel:
-      name: "homelab-vps"
-      service: "http://fleet:8080"
-  # DigitalOcean App Platform rehearsal (do/terraform). DNS-only: a proxied
-  # record breaks App Platform's certificate renewal. Removed at cutover,
-  # when auth and fleet themselves move to the apps.
-  - name: "auth-do"
     type: CNAME
     ttl: 300
     values:
       - "authentik-8qarp.ondigitalocean.app"
-  - name: "fleet-do"
+  - name: "fleet"
     type: CNAME
     ttl: 300
     values:
