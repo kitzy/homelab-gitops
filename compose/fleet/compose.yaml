@@ -16,7 +16,8 @@
 #   MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD, FLEET_SERVER_PRIVATE_KEY,
 #   FLEET_LICENSE_KEY, FLEET_S3_SOFTWARE_INSTALLERS_BUCKET,
 #   FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID,
-#   FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY
+#   FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY,
+#   FLEET_S3_SOFTWARE_INSTALLERS_ENDPOINT_URL
 
 x-fleet-mysql-env: &fleet-mysql-env
   FLEET_MYSQL_ADDRESS: fleet-mysql:3306
@@ -106,11 +107,15 @@ services:
       # Secrets
       FLEET_SERVER_PRIVATE_KEY: ${FLEET_SERVER_PRIVATE_KEY:?FLEET_SERVER_PRIVATE_KEY is required}
       FLEET_LICENSE_KEY: ${FLEET_LICENSE_KEY:?FLEET_LICENSE_KEY is required}
-      # Software installers in external AWS S3, static keys from 1Password
+      # Software installers (plus icons, bootstrap packages, org logos) in the
+      # Cloudflare R2 bucket kitzy-fleet-installers (do/terraform). The key
+      # pair is scoped to that bucket. R2's region is "auto"; it must be set,
+      # or Fleet asks AWS for the bucket's region at startup.
       FLEET_S3_SOFTWARE_INSTALLERS_BUCKET: ${FLEET_S3_SOFTWARE_INSTALLERS_BUCKET:?FLEET_S3_SOFTWARE_INSTALLERS_BUCKET is required}
       FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID: ${FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID:?FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID is required}
       FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY: ${FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY:?FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY is required}
-      FLEET_S3_SOFTWARE_INSTALLERS_REGION: us-east-1
+      FLEET_S3_SOFTWARE_INSTALLERS_ENDPOINT_URL: ${FLEET_S3_SOFTWARE_INSTALLERS_ENDPOINT_URL:?FLEET_S3_SOFTWARE_INSTALLERS_ENDPOINT_URL is required}
+      FLEET_S3_SOFTWARE_INSTALLERS_REGION: auto
       # Vulnerability scanning
       FLEET_VULNERABILITIES_DATABASES_PATH: /var/lib/fleet/vulndb
       # Fleet's default. 5m (carried over from K3s) kept MySQL near a full core.

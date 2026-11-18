@@ -67,7 +67,8 @@ Doco-CD reads these from the `Homelab` vault. The 1Password provider has no bulk
 | Item | Fields | Used by |
 | --- | --- | --- |
 | `authentik-secrets` | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `AUTHENTIK_SECRET_KEY`, `AUTHENTIK_HOST`, `AUTHENTIK_COOKIE_DOMAIN` | `authentik`, `backup` |
-| `Fleet Secrets` | `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `FLEET_SERVER_PRIVATE_KEY`, `FLEET_LICENSE_KEY`, `FLEET_S3_SOFTWARE_INSTALLERS_BUCKET`, `FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID`, `FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY` | `fleet`, `backup` |
+| `Fleet Secrets` | `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `FLEET_SERVER_PRIVATE_KEY`, `FLEET_LICENSE_KEY` (its old S3 fields are unused) | `fleet`, `backup` |
+| `Fleet R2` | `FLEET_S3_SOFTWARE_INSTALLERS_BUCKET`, `FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID`, `FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY`, `FLEET_S3_SOFTWARE_INSTALLERS_ENDPOINT_URL` (R2 bucket `kitzy-fleet-installers`, keys scoped to it) | `fleet` |
 | `Cloudflare Tunnel` | `VPS_TUNNEL_TOKEN` (token of tunnel `homelab-vps`, ID `0b72a860-709f-40ba-816c-7727f12e100f`) | `edge` |
 | `restic homelab-vps` | `password`, `ssh_private_key_b64` (base64 on one line), `ssh_public_key` | `backup` |
 | `Healthchecks homelab-vps` | `backup_ping_url`, `check_ping_url` | `backup` |
