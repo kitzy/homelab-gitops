@@ -4,3 +4,8 @@ provider "cloudflare" {
   # The token has Workers R2 Storage Read + Write only: it can manage buckets,
   # but not zones or API tokens.
 }
+
+provider "digitalocean" {
+  # Reads the API token from DIGITALOCEAN_TOKEN. CI loads it from
+  # op://GitHub/DigitalOcean API Token (team Homelab).
+}
