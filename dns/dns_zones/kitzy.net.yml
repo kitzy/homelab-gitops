@@ -76,3 +76,16 @@ records:
     tunnel:
       name: "homelab-vps"
       service: "http://fleet:8080"
+  # DigitalOcean App Platform rehearsal (do/terraform). DNS-only: a proxied
+  # record breaks App Platform's certificate renewal. Removed at cutover,
+  # when auth and fleet themselves move to the apps.
+  - name: "auth-do"
+    type: CNAME
+    ttl: 300
+    values:
+      - "authentik-8qarp.ondigitalocean.app"
+  - name: "fleet-do"
+    type: CNAME
+    ttl: 300
+    values:
+      - "fleet-ph8fr.ondigitalocean.app"
