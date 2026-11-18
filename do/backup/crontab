@@ -1,0 +1,8 @@
+# supercronic crontab. Times are America/New_York, as on the Vultr VM.
+CRON_TZ=America/New_York
+
+# Nightly: dump Fleet and Authentik, snapshot both to R2, apply retention.
+0 23 * * * /usr/local/bin/backup.sh nightly
+
+# Weekly: verify the repository.
+0 21 * * 0 /usr/local/bin/backup.sh check
