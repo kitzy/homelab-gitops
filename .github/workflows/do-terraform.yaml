@@ -1,0 +1,135 @@
+name: DO Terraform
+
+# GitOps for the DigitalOcean move (do/terraform/ Terraform root).
+#   - Pull requests touching do/terraform/** run fmt/validate/plan (no changes).
+#   - Push to main touching do/terraform/** runs apply.
+# HCP Terraform holds remote state (local execution); secrets come from 1Password.
+# The R2 buckets have prevent_destroy, so an apply can never delete them.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'do/terraform/**'
+      - '.github/workflows/do-terraform.yaml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'do/terraform/**'
+      - '.github/workflows/do-terraform.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write # the plan job posts the Terraform plan as a PR comment
+
+jobs:
+  terraform:
+    name: Plan / Apply
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: do/terraform
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        id: op-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          TF_API_TOKEN: op://GitHub/Terraform Cloud/credential
+          CLOUDFLARE_API_TOKEN: op://GitHub/Cloudflare R2 Terraform/api_token
+          CLOUDFLARE_ACCOUNT_ID: op://GitHub/Cloudflare R2 Terraform/account_id
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ steps.op-secrets.outputs.TF_API_TOKEN }}
+
+      - name: Terraform fmt
+        run: terraform fmt -check
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        continue-on-error: true # comment the result on the PR before failing on error
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.op-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ steps.op-secrets.outputs.CLOUDFLARE_ACCOUNT_ID }}
+        run: terraform plan -no-color -input=false
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          PLAN_STDOUT: ${{ steps.plan.outputs.stdout }}
+          PLAN_STDERR: ${{ steps.plan.outputs.stderr }}
+        with:
+          script: |
+            const marker = '<!-- do-terraform-plan -->';
+            const stdout = process.env.PLAN_STDOUT || '';
+            const stderr = process.env.PLAN_STDERR || '';
+            const raw = (stderr ? stdout + '\n' + stderr : stdout).trim() || '(no output)';
+            const max = 60000;
+            const plan = raw.length > max
+              ? raw.slice(0, max) + '\n\n... output truncated; see the workflow run logs for the full plan.'
+              : raw;
+            const ok = '${{ steps.plan.outputs.exitcode }}' === '0';
+            const body = [
+              marker,
+              `## DO Terraform plan ${ok ? '📋' : '❌'}`,
+              '',
+              '<details><summary>Show plan</summary>',
+              '',
+              '```terraform',
+              plan,
+              '```',
+              '',
+              '</details>',
+              '',
+              '*Merging to `main` runs `terraform apply`.*',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan errored
+        if: github.event_name == 'pull_request' && steps.plan.outputs.exitcode != '0'
+        run: exit 1
+
+      - name: Terraform apply
+        if: github.event_name == 'push'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.op-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ steps.op-secrets.outputs.CLOUDFLARE_ACCOUNT_ID }}
+        run: terraform apply -auto-approve -input=false
