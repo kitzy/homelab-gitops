@@ -11,23 +11,35 @@ App Platform app exist. The app runs on empty databases at
 auth-do.kitzy.net and fleet-do.kitzy.net (`local.rehearsal` in
 `terraform/app.tf`). Production stays on the Vultr VM until the cutover.
 
-## Components (app `homelab`, region nyc)
+## Apps (region nyc)
 
-| Component | Kind | Size |
-| --- | --- | --- |
-| `authentik-server` | service, port 9000 | apps-s-1vcpu-1gb-fixed |
-| `authentik-worker` | worker | apps-s-1vcpu-0.5gb |
-| `fleet` | service, port 8080 | apps-s-1vcpu-1gb-fixed |
-| `fleet-migrate` | PRE_DEPLOY job (`fleet prepare db`) | apps-s-1vcpu-0.5gb |
-| `redis` | internal service, port 6379 | apps-s-1vcpu-0.5gb |
-| `backup` | worker built from `do/backup/` | apps-s-1vcpu-0.5gb |
+Three App Platform apps, so each deploys, fails and rolls back on its own.
+
+| App | Component | Kind | Size |
+| --- | --- | --- | --- |
+| `authentik` | `authentik-server` | service, port 9000 | apps-s-1vcpu-1gb-fixed |
+| | `authentik-worker` | worker | apps-s-1vcpu-0.5gb |
+| `fleet` | `fleet` | service, port 8080 | apps-s-1vcpu-1gb-fixed |
+| | `fleet-migrate` | PRE_DEPLOY job (`fleet prepare db`) | apps-s-1vcpu-0.5gb |
+| | `redis` | internal service, port 6379 | apps-s-1vcpu-0.5gb |
+| `backups` | `backup` | worker built from `do/backup/` | apps-s-1vcpu-0.5gb |
 
 Databases: `fleet-mysql` (MySQL 8.4, database and user `fleet`) and
 `authentik-pg` (PostgreSQL 17, database and user `authentik`), both
 db-s-1vcpu-1gb in nyc3, with daily backups and 7 days of point-in-time
-restore. Their firewalls admit the app, plus the Vultr VM until the cutover.
+restore. Each firewall admits the apps that use that database (`backups`
+uses both), plus the Vultr VM until the cutover.
 
 ## Database setup notes
+
+- **Creating an app for the first time:** Terraform learns an app's ID
+  only after its first deploy finishes, but that deploy needs the database
+  firewall to admit the app. As soon as the new app shows up in
+  `doctl apps list` (or the API), add the same trusted sources Terraform
+  will apply: the VM IP while it's listed, plus each app that uses the
+  database (`PUT /v2/databases/<id>/firewall`). The 10-minute first-boot
+  health check windows leave time for this. Terraform's later firewall
+  update is then a no-op.
 
 - **MySQL settings:** DigitalOcean may reset `sql_require_primary_key` and
   `sql_mode` when it creates a cluster. After creating one, run a plan; if

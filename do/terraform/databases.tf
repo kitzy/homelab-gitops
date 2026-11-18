@@ -8,7 +8,8 @@ locals {
   db_region = "nyc3"
 
   # Trusted sources while the data is loaded from the Vultr VM. Removed after
-  # the cutover. The app (app.tf) is the permanent trusted source.
+  # the cutover. The apps that use each database (app.tf) are its permanent
+  # trusted sources.
   migration_source_ips = ["45.77.154.196"]
 }
 
@@ -62,7 +63,12 @@ resource "digitalocean_database_firewall" "fleet_mysql" {
 
   rule {
     type  = "app"
-    value = digitalocean_app.homelab.id
+    value = digitalocean_app.fleet.id
+  }
+
+  rule {
+    type  = "app"
+    value = digitalocean_app.backups.id
   }
 
   dynamic "rule" {
@@ -113,7 +119,12 @@ resource "digitalocean_database_firewall" "authentik_pg" {
 
   rule {
     type  = "app"
-    value = digitalocean_app.homelab.id
+    value = digitalocean_app.authentik.id
+  }
+
+  rule {
+    type  = "app"
+    value = digitalocean_app.backups.id
   }
 
   dynamic "rule" {

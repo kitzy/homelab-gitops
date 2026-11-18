@@ -1,4 +1,12 @@
-# The App Platform app: Authentik, Fleet, Redis and the backup worker.
+# Three App Platform apps: authentik, fleet (with Redis and the migration
+# job) and backups. Separate apps deploy, fail and roll back independently,
+# and each database firewall admits only the apps that use that database.
+#
+# FIRST CREATION of an app: Terraform only learns an app's ID after its first
+# deploy finishes, but that deploy needs the database firewall to admit the
+# app. Right after an app appears in the API, add the same trusted-source
+# rules Terraform will apply (see do/README.md); the long first-boot health
+# check windows leave time for it.
 #
 # REHEARSAL MODE (until the cutover PR):
 #   - The databases are empty. Fleet and Authentik create fresh schemas. A
@@ -9,8 +17,7 @@
 #     none.
 #   - Authentik starts with a random bootstrap password, so its initial-setup
 #     flow is closed. Fleet's setup is completed right after the first deploy
-#     through the app's default URL (only the default URL routes to Fleet
-#     without a host match).
+#     through the fleet app's default URL.
 #   - Domains are auth-do.kitzy.net and fleet-do.kitzy.net.
 #   - Healthchecks.io pings are off, so the rehearsal can't signal the VM's checks.
 #
@@ -89,9 +96,9 @@ resource "random_password" "authentik_bootstrap" {
   special = false
 }
 
-resource "digitalocean_app" "homelab" {
+resource "digitalocean_app" "authentik" {
   spec {
-    name   = "homelab"
+    name   = "authentik"
     region = "nyc"
 
     alert {
@@ -105,19 +112,7 @@ resource "digitalocean_app" "homelab" {
       name = local.domains.authentik
       type = "PRIMARY"
     }
-    domain {
-      name = local.domains.fleet
-      type = "ALIAS"
-    }
 
-    database {
-      name         = "fleet-mysql"
-      engine       = "MYSQL"
-      production   = true
-      cluster_name = digitalocean_database_cluster.fleet_mysql.name
-      db_name      = digitalocean_database_db.fleet.name
-      db_user      = digitalocean_database_user.fleet.name
-    }
     database {
       name         = "authentik-pg"
       engine       = "PG"
@@ -130,27 +125,12 @@ resource "digitalocean_app" "homelab" {
     ingress {
       rule {
         match {
-          authority {
-            exact = local.domains.authentik
-          }
           path {
             prefix = "/"
           }
         }
         component {
           name = "authentik-server"
-        }
-      }
-      # Everything else, including fleet-do/fleet.kitzy.net and the default
-      # *.ondigitalocean.app URL, goes to Fleet.
-      rule {
-        match {
-          path {
-            prefix = "/"
-          }
-        }
-        component {
-          name = "fleet"
         }
       }
     }
@@ -174,10 +154,12 @@ resource "digitalocean_app" "homelab" {
       health_check {
         http_path             = "/-/health/live/"
         port                  = 9000
-        initial_delay_seconds = 60
+        initial_delay_seconds = 120
         period_seconds        = 15
         timeout_seconds       = 10
-        failure_threshold     = 20 # first boot runs every migration
+        # 10+ minutes: the first boot runs every migration, and the firewall
+        # rule for a new app is added during its first deploy (see top).
+        failure_threshold = 40
       }
 
       dynamic "env" {
@@ -235,6 +217,47 @@ resource "digitalocean_app" "homelab" {
           value = env.value
           scope = "RUN_TIME"
           type  = "SECRET"
+        }
+      }
+    }
+  }
+}
+
+resource "digitalocean_app" "fleet" {
+  spec {
+    name   = "fleet"
+    region = "nyc"
+
+    alert {
+      rule = "DEPLOYMENT_FAILED"
+    }
+    alert {
+      rule = "DOMAIN_FAILED"
+    }
+
+    domain {
+      name = local.domains.fleet
+      type = "PRIMARY"
+    }
+
+    database {
+      name         = "fleet-mysql"
+      engine       = "MYSQL"
+      production   = true
+      cluster_name = digitalocean_database_cluster.fleet_mysql.name
+      db_name      = digitalocean_database_db.fleet.name
+      db_user      = digitalocean_database_user.fleet.name
+    }
+
+    ingress {
+      rule {
+        match {
+          path {
+            prefix = "/"
+          }
+        }
+        component {
+          name = "fleet"
         }
       }
     }
@@ -308,10 +331,10 @@ resource "digitalocean_app" "homelab" {
       health_check {
         http_path             = "/healthz"
         port                  = 8080
-        initial_delay_seconds = 30
+        initial_delay_seconds = 60
         period_seconds        = 15
         timeout_seconds       = 10
-        failure_threshold     = 6
+        failure_threshold     = 40 # see the first-creation note at the top
       }
 
       dynamic "env" {
@@ -346,6 +369,34 @@ resource "digitalocean_app" "homelab" {
           type  = "SECRET"
         }
       }
+    }
+  }
+}
+
+resource "digitalocean_app" "backups" {
+  spec {
+    name   = "backups"
+    region = "nyc"
+
+    alert {
+      rule = "DEPLOYMENT_FAILED"
+    }
+
+    database {
+      name         = "fleet-mysql"
+      engine       = "MYSQL"
+      production   = true
+      cluster_name = digitalocean_database_cluster.fleet_mysql.name
+      db_name      = digitalocean_database_db.fleet.name
+      db_user      = digitalocean_database_user.fleet.name
+    }
+    database {
+      name         = "authentik-pg"
+      engine       = "PG"
+      production   = true
+      cluster_name = digitalocean_database_cluster.authentik_pg.name
+      db_name      = digitalocean_database_db.authentik.name
+      db_user      = digitalocean_database_user.authentik.name
     }
 
     # --- Backups ----------------------------------------------------------------
