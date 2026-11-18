@@ -113,7 +113,8 @@ services:
       FLEET_S3_SOFTWARE_INSTALLERS_REGION: us-east-1
       # Vulnerability scanning
       FLEET_VULNERABILITIES_DATABASES_PATH: /var/lib/fleet/vulndb
-      FLEET_VULNERABILITIES_PERIODICITY: 5m
+      # Fleet's default. 5m (carried over from K3s) kept MySQL near a full core.
+      FLEET_VULNERABILITIES_PERIODICITY: 1h
       FLEET_VULNERABILITIES_CURRENT_INSTANCE_CHECKS: "yes"
       # Osquery
       FLEET_OSQUERY_HOST_IDENTIFIER: uuid
