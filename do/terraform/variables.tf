@@ -45,3 +45,14 @@ variable "hc_check_url" {
   type      = string
   sensitive = true
 }
+
+variable "fleet_r2_access_key_id" {
+  description = "S3 key pair scoped to the kitzy-fleet-installers R2 bucket (op://GitHub/Fleet R2 homelab-do)."
+  type        = string
+  sensitive   = true
+}
+
+variable "fleet_r2_secret_access_key" {
+  type      = string
+  sensitive = true
+}

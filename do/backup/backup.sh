@@ -11,7 +11,8 @@
 #   AUTHENTIK_DB_HOST/PORT/USER/PASSWORD/NAME, AUTHENTIK_DB_CA
 #   RESTIC_REPOSITORY, RESTIC_PASSWORD, AWS_ACCESS_KEY_ID,
 #   AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION=auto, RESTIC_HOST
-#   HC_BACKUP_URL, HC_CHECK_URL  Healthchecks.io ping URLs; empty = no pings
+#   HC_BACKUP_URL, HC_CHECK_URL  Healthchecks.io ping URLs
+#   HC_ENABLED                   "true" to send pings (off in rehearsal mode)
 set -uo pipefail
 
 job=${1:?usage: backup.sh nightly|check}
@@ -24,7 +25,7 @@ printf '%s\n' "$AUTHENTIK_DB_CA" > "$certs/pg-ca.pem"
 log() { echo "[$job] $*"; }
 
 hc_ping() { # $1 = URL, $2 = "" | /start | /fail
-  [ -n "$1" ] || return 0
+  [ "${HC_ENABLED:-false}" = "true" ] && [ -n "$1" ] || return 0
   curl -fsS -m 10 --retry 3 -o /dev/null "$1$2" || log "WARN: Healthchecks ping '$2' failed"
 }
 

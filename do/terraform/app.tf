@@ -12,15 +12,28 @@
 #   - The databases are empty. Fleet and Authentik create fresh schemas. A
 #     second Fleet or Authentik on a copy of production would run production's
 #     background jobs (webhooks, Apple MDM/ABM sync, SCIM/LDAP sync).
-#   - Fleet has no R2 settings: its cleanup job deletes installer objects
+#   - Fleet has no R2 bucket set: its cleanup job deletes installer objects
 #     its database doesn't reference, and the rehearsal database references
-#     none.
+#     none. (The R2 keys are in place, unused.)
 #   - Authentik starts with a random bootstrap password, so its initial-setup
 #     flow is closed. Fleet's setup is completed right after the first deploy
 #     through the fleet app's default URL.
 #   - Domains are auth-do.kitzy.net and fleet-do.kitzy.net.
-#   - Healthchecks.io pings are off, so the rehearsal can't signal the VM's checks.
+#   - Healthchecks.io pings are off (HC_ENABLED), so the rehearsal can't
+#     signal the VM's checks.
 #   - The backup worker runs its nightly job once on every deploy.
+#
+# ENV VARS. App Platform stores SECRET values encrypted and returns only the
+# ciphertext, so the provider always sees them as changed and every apply
+# would redeploy every app. Therefore:
+#   - Component env is all type GENERAL and fully managed. Database passwords
+#     are GENERAL too: the value is a `${db.PASSWORD}` reference that App
+#     Platform resolves at runtime, not the password itself.
+#   - Real secrets are app-level SECRET env with ignore_changes. Terraform
+#     sets them when an app is created (or when the ignore is lifted) and
+#     never diffs them afterwards. To rotate one: update 1Password, then in
+#     one PR remove `spec[0].env` from that app's ignore_changes, apply, and
+#     put it back in a follow-up PR.
 #
 # App Platform notes:
 #   - run_command replaces the image's ENTRYPOINT, so Authentik's commands
@@ -60,19 +73,39 @@ locals {
   fleet_mysql_env = {
     FLEET_MYSQL_ADDRESS  = "$${fleet-mysql.HOSTNAME}:$${fleet-mysql.PORT}"
     FLEET_MYSQL_USERNAME = "$${fleet-mysql.USERNAME}"
+    FLEET_MYSQL_PASSWORD = "$${fleet-mysql.PASSWORD}"
     FLEET_MYSQL_DATABASE = "$${fleet-mysql.DATABASE}"
     FLEET_MYSQL_TLS_CA   = "/tmp/mysql-ca.pem"
     FLEET_MYSQL_CA_PEM   = "$${fleet-mysql.CA_CERT}"
   }
-  fleet_mysql_secret_env = {
-    FLEET_MYSQL_PASSWORD = "$${fleet-mysql.PASSWORD}"
-  }
+
+  fleet_server_env = merge(local.fleet_mysql_env, {
+    FLEET_SERVER_ADDRESS                          = "0.0.0.0:8080"
+    FLEET_SERVER_TLS                              = "false"
+    FLEET_LOGGING_JSON                            = "true"
+    FLEET_SERVER_MAX_INSTALLER_SIZE               = "20G"
+    FLEET_SESSION_DURATION                        = "1h"
+    FLEET_REDIS_ADDRESS                           = "redis:6379"
+    FLEET_VULNERABILITIES_DATABASES_PATH          = "/tmp/vulndb"
+    FLEET_VULNERABILITIES_PERIODICITY             = "1h"
+    FLEET_VULNERABILITIES_CURRENT_INSTANCE_CHECKS = "yes"
+    FLEET_OSQUERY_HOST_IDENTIFIER                 = "uuid"
+    FLEET_OSQUERY_LABEL_UPDATE_INTERVAL           = "1m"
+    }, local.rehearsal ? {} : {
+    # Software installers, icons, bootstrap packages and org logos in R2.
+    # The key pair is app-level SECRET env. Region must be set, or Fleet asks
+    # AWS for the bucket's region at startup.
+    FLEET_S3_SOFTWARE_INSTALLERS_BUCKET       = cloudflare_r2_bucket.fleet_installers.name
+    FLEET_S3_SOFTWARE_INSTALLERS_ENDPOINT_URL = "https://${var.cloudflare_account_id}.r2.cloudflarestorage.com"
+    FLEET_S3_SOFTWARE_INSTALLERS_REGION       = "auto"
+  })
 
   authentik_env = {
     AUTHENTIK_POSTGRESQL__HOST          = "$${authentik-pg.HOSTNAME}"
     AUTHENTIK_POSTGRESQL__PORT          = "$${authentik-pg.PORT}"
     AUTHENTIK_POSTGRESQL__NAME          = "$${authentik-pg.DATABASE}"
     AUTHENTIK_POSTGRESQL__USER          = "$${authentik-pg.USERNAME}"
+    AUTHENTIK_POSTGRESQL__PASSWORD      = "$${authentik-pg.PASSWORD}"
     AUTHENTIK_POSTGRESQL__SSLMODE       = "verify-full"
     AUTHENTIK_POSTGRESQL__SSLROOTCERT   = "/tmp/pg-ca.pem"
     AUTHENTIK_PG_CA_PEM                 = "$${authentik-pg.CA_CERT}"
@@ -83,19 +116,63 @@ locals {
     AUTHENTIK_DISABLE_STARTUP_ANALYTICS = "true"
     AUTHENTIK_LOG_LEVEL                 = "info"
   }
-  authentik_secret_env = merge(
-    {
-      AUTHENTIK_POSTGRESQL__PASSWORD = "$${authentik-pg.PASSWORD}"
-      AUTHENTIK_SECRET_KEY           = var.authentik_secret_key
-    },
+
+  authentik_server_env = merge(local.authentik_env, {
+    AUTHENTIK_LISTEN__HTTP = "0.0.0.0:9000"
+    AUTHENTIK_WEB__WORKERS = "2"
+    # App Platform's edge proxies reach the container from private
+    # addresses. Verified 2026-11-18: Authentik logs the real client IP.
+    AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS = "10.0.0.0/8,172.16.0.0/12,100.64.0.0/10"
+    AUTHENTIK_AVATARS                     = "gravatar,initials"
+  })
+
+  backup_env = {
+    FLEET_DB_HOST         = "$${fleet-mysql.HOSTNAME}"
+    FLEET_DB_PORT         = "$${fleet-mysql.PORT}"
+    FLEET_DB_USER         = "$${fleet-mysql.USERNAME}"
+    FLEET_DB_PASSWORD     = "$${fleet-mysql.PASSWORD}"
+    FLEET_DB_NAME         = "$${fleet-mysql.DATABASE}"
+    FLEET_DB_CA           = "$${fleet-mysql.CA_CERT}"
+    AUTHENTIK_DB_HOST     = "$${authentik-pg.HOSTNAME}"
+    AUTHENTIK_DB_PORT     = "$${authentik-pg.PORT}"
+    AUTHENTIK_DB_USER     = "$${authentik-pg.USERNAME}"
+    AUTHENTIK_DB_PASSWORD = "$${authentik-pg.PASSWORD}"
+    AUTHENTIK_DB_NAME     = "$${authentik-pg.DATABASE}"
+    AUTHENTIK_DB_CA       = "$${authentik-pg.CA_CERT}"
+    RESTIC_REPOSITORY     = "s3:https://${var.cloudflare_account_id}.r2.cloudflarestorage.com/${cloudflare_r2_bucket.backups.name}"
+    AWS_DEFAULT_REGION    = "auto"
+    RESTIC_HOST           = "homelab-do"
+    HC_ENABLED            = local.rehearsal ? "false" : "true"
+    # Rehearsal: back up once on every deploy (see do/backup/entrypoint.sh).
+    BACKUP_RUN_ON_START = local.rehearsal ? "true" : "false"
+  }
+
+  # App-level SECRET env (see ENV VARS above).
+  authentik_secrets = merge(
+    { AUTHENTIK_SECRET_KEY = var.authentik_secret_key },
     local.rehearsal ? { AUTHENTIK_BOOTSTRAP_PASSWORD = random_password.authentik_bootstrap.result } : {}
   )
+  fleet_secrets = {
+    FLEET_SERVER_PRIVATE_KEY                       = var.fleet_server_private_key
+    FLEET_LICENSE_KEY                              = var.fleet_license_key
+    FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID     = var.fleet_r2_access_key_id
+    FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY = var.fleet_r2_secret_access_key
+  }
+  backup_secrets = {
+    RESTIC_PASSWORD       = var.restic_password
+    AWS_ACCESS_KEY_ID     = var.r2_backups_access_key_id
+    AWS_SECRET_ACCESS_KEY = var.r2_backups_secret_access_key
+    HC_BACKUP_URL         = var.hc_backup_url
+    HC_CHECK_URL          = var.hc_check_url
+  }
 }
 
 resource "random_password" "authentik_bootstrap" {
   length  = 32
   special = false
 }
+
+# --- Authentik ----------------------------------------------------------------
 
 resource "digitalocean_app" "authentik" {
   spec {
@@ -123,6 +200,16 @@ resource "digitalocean_app" "authentik" {
       db_user      = digitalocean_database_user.authentik.name
     }
 
+    dynamic "env" {
+      for_each = local.authentik_secrets
+      content {
+        key   = env.key
+        value = env.value
+        scope = "RUN_TIME"
+        type  = "SECRET"
+      }
+    }
+
     ingress {
       rule {
         match {
@@ -135,8 +222,6 @@ resource "digitalocean_app" "authentik" {
         }
       }
     }
-
-    # --- Authentik --------------------------------------------------------
 
     service {
       name               = "authentik-server"
@@ -164,28 +249,12 @@ resource "digitalocean_app" "authentik" {
       }
 
       dynamic "env" {
-        for_each = merge(local.authentik_env, {
-          AUTHENTIK_LISTEN__HTTP = "0.0.0.0:9000"
-          AUTHENTIK_WEB__WORKERS = "2"
-          # App Platform's edge proxies reach the container from private
-          # addresses. Checked after deploy: login events must show real
-          # client IPs.
-          AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS = "10.0.0.0/8,172.16.0.0/12,100.64.0.0/10"
-          AUTHENTIK_AVATARS                     = "gravatar,initials"
-        })
+        for_each = local.authentik_server_env
         content {
           key   = env.key
           value = env.value
           scope = "RUN_TIME"
-        }
-      }
-      dynamic "env" {
-        for_each = local.authentik_secret_env
-        content {
-          key   = env.key
-          value = env.value
-          scope = "RUN_TIME"
-          type  = "SECRET"
+          type  = "GENERAL"
         }
       }
     }
@@ -209,20 +278,14 @@ resource "digitalocean_app" "authentik" {
           key   = env.key
           value = env.value
           scope = "RUN_TIME"
-        }
-      }
-      dynamic "env" {
-        for_each = local.authentik_secret_env
-        content {
-          key   = env.key
-          value = env.value
-          scope = "RUN_TIME"
-          type  = "SECRET"
+          type  = "GENERAL"
         }
       }
     }
   }
 }
+
+# --- Fleet ----------------------------------------------------------------------
 
 resource "digitalocean_app" "fleet" {
   spec {
@@ -250,6 +313,16 @@ resource "digitalocean_app" "fleet" {
       db_user      = digitalocean_database_user.fleet.name
     }
 
+    dynamic "env" {
+      for_each = local.fleet_secrets
+      content {
+        key   = env.key
+        value = env.value
+        scope = "RUN_TIME"
+        type  = "SECRET"
+      }
+    }
+
     ingress {
       rule {
         match {
@@ -262,8 +335,6 @@ resource "digitalocean_app" "fleet" {
         }
       }
     }
-
-    # --- Fleet --------------------------------------------------------------
 
     service {
       name               = "redis"
@@ -302,15 +373,7 @@ resource "digitalocean_app" "fleet" {
           key   = env.key
           value = env.value
           scope = "RUN_TIME"
-        }
-      }
-      dynamic "env" {
-        for_each = local.fleet_mysql_secret_env
-        content {
-          key   = env.key
-          value = env.value
-          scope = "RUN_TIME"
-          type  = "SECRET"
+          type  = "GENERAL"
         }
       }
     }
@@ -339,40 +402,19 @@ resource "digitalocean_app" "fleet" {
       }
 
       dynamic "env" {
-        for_each = merge(local.fleet_mysql_env, {
-          FLEET_SERVER_ADDRESS                          = "0.0.0.0:8080"
-          FLEET_SERVER_TLS                              = "false"
-          FLEET_LOGGING_JSON                            = "true"
-          FLEET_SERVER_MAX_INSTALLER_SIZE               = "20G"
-          FLEET_SESSION_DURATION                        = "1h"
-          FLEET_REDIS_ADDRESS                           = "redis:6379"
-          FLEET_VULNERABILITIES_DATABASES_PATH          = "/tmp/vulndb"
-          FLEET_VULNERABILITIES_PERIODICITY             = "1h"
-          FLEET_VULNERABILITIES_CURRENT_INSTANCE_CHECKS = "yes"
-          FLEET_OSQUERY_HOST_IDENTIFIER                 = "uuid"
-          FLEET_OSQUERY_LABEL_UPDATE_INTERVAL           = "1m"
-        })
+        for_each = local.fleet_server_env
         content {
           key   = env.key
           value = env.value
           scope = "RUN_TIME"
-        }
-      }
-      dynamic "env" {
-        for_each = merge(local.fleet_mysql_secret_env, {
-          FLEET_SERVER_PRIVATE_KEY = var.fleet_server_private_key
-          FLEET_LICENSE_KEY        = var.fleet_license_key
-        })
-        content {
-          key   = env.key
-          value = env.value
-          scope = "RUN_TIME"
-          type  = "SECRET"
+          type  = "GENERAL"
         }
       }
     }
   }
 }
+
+# --- Backups --------------------------------------------------------------------
 
 resource "digitalocean_app" "backups" {
   spec {
@@ -400,7 +442,15 @@ resource "digitalocean_app" "backups" {
       db_user      = digitalocean_database_user.authentik.name
     }
 
-    # --- Backups ----------------------------------------------------------------
+    dynamic "env" {
+      for_each = local.backup_secrets
+      content {
+        key   = env.key
+        value = env.value
+        scope = "RUN_TIME"
+        type  = "SECRET"
+      }
+    }
 
     worker {
       name               = "backup"
@@ -417,48 +467,12 @@ resource "digitalocean_app" "backups" {
       }
 
       dynamic "env" {
-        for_each = {
-          FLEET_DB_HOST      = "$${fleet-mysql.HOSTNAME}"
-          FLEET_DB_PORT      = "$${fleet-mysql.PORT}"
-          FLEET_DB_USER      = "$${fleet-mysql.USERNAME}"
-          FLEET_DB_NAME      = "$${fleet-mysql.DATABASE}"
-          FLEET_DB_CA        = "$${fleet-mysql.CA_CERT}"
-          AUTHENTIK_DB_HOST  = "$${authentik-pg.HOSTNAME}"
-          AUTHENTIK_DB_PORT  = "$${authentik-pg.PORT}"
-          AUTHENTIK_DB_USER  = "$${authentik-pg.USERNAME}"
-          AUTHENTIK_DB_NAME  = "$${authentik-pg.DATABASE}"
-          AUTHENTIK_DB_CA    = "$${authentik-pg.CA_CERT}"
-          RESTIC_REPOSITORY  = "s3:https://${var.cloudflare_account_id}.r2.cloudflarestorage.com/${cloudflare_r2_bucket.backups.name}"
-          AWS_DEFAULT_REGION = "auto"
-          RESTIC_HOST        = "homelab-do"
-          # Rehearsal: back up once on every deploy (see do/backup/entrypoint.sh).
-          BACKUP_RUN_ON_START = local.rehearsal ? "true" : "false"
-        }
+        for_each = local.backup_env
         content {
           key   = env.key
           value = env.value
           scope = "RUN_TIME"
-        }
-      }
-      dynamic "env" {
-        for_each = merge(
-          {
-            FLEET_DB_PASSWORD     = "$${fleet-mysql.PASSWORD}"
-            AUTHENTIK_DB_PASSWORD = "$${authentik-pg.PASSWORD}"
-            RESTIC_PASSWORD       = var.restic_password
-            AWS_ACCESS_KEY_ID     = var.r2_backups_access_key_id
-            AWS_SECRET_ACCESS_KEY = var.r2_backups_secret_access_key
-          },
-          local.rehearsal ? {} : {
-            HC_BACKUP_URL = var.hc_backup_url
-            HC_CHECK_URL  = var.hc_check_url
-          }
-        )
-        content {
-          key   = env.key
-          value = env.value
-          scope = "RUN_TIME"
-          type  = "SECRET"
+          type  = "GENERAL"
         }
       }
     }
