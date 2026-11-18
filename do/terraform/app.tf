@@ -8,7 +8,8 @@
 # rules Terraform will apply (see do/README.md); the long first-boot health
 # check windows leave time for it.
 #
-# REHEARSAL MODE (until the cutover PR):
+# REHEARSAL MODE (local.rehearsal = true; used before the cutover on
+# 2026-11-18, kept for rebuilding a rehearsal environment):
 #   - The databases are empty. Fleet and Authentik create fresh schemas. A
 #     second Fleet or Authentik on a copy of production would run production's
 #     background jobs (webhooks, Apple MDM/ABM sync, SCIM/LDAP sync).
@@ -44,7 +45,8 @@
 #     variables.
 
 locals {
-  rehearsal = true
+  # Rehearsal ended at the cutover on 2026-11-18 (see REHEARSAL MODE above).
+  rehearsal = false
 
   domains = local.rehearsal ? {
     authentik = "auth-do.kitzy.net"
