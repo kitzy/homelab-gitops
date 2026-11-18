@@ -36,12 +36,15 @@ RUN set -eux; \
 
 COPY --from=restic /usr/bin/restic /usr/local/bin/restic
 COPY crontab /etc/backup/crontab
-COPY --chmod=0755 backup.sh /usr/local/bin/backup.sh
-COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY backup.sh entrypoint.sh /usr/local/bin/
+# A separate chmod, not COPY --chmod: App Platform's builder ignores --chmod.
+RUN chmod 0755 /usr/local/bin/backup.sh /usr/local/bin/entrypoint.sh
 
 # Unprivileged. ("backup" is already a Debian system user.)
 RUN useradd --create-home --uid 10001 dbbackup && install -d -o dbbackup /dumps /cache
 USER dbbackup
 ENV RESTIC_CACHE_DIR=/cache
 
-CMD ["/usr/local/bin/entrypoint.sh"]
+# Replace the postgres image's docker-entrypoint.sh, which isn't needed here.
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD []

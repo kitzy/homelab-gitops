@@ -18,3 +18,8 @@ output "app_default_urls" {
     fleet     = digitalocean_app.fleet.default_ingress
   }
 }
+
+output "backups_app_id" {
+  description = "App ID of the backups app. The workflow force-rebuilds it when do/backup/ changes."
+  value       = digitalocean_app.backups.id
+}

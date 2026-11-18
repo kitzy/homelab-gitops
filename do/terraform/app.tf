@@ -119,7 +119,7 @@ locals {
 
   authentik_server_env = merge(local.authentik_env, {
     AUTHENTIK_LISTEN__HTTP = "0.0.0.0:9000"
-    AUTHENTIK_WEB__WORKERS = "2"
+    AUTHENTIK_WEB__WORKERS = "1" # 2 ran the 1 GB instance at 98% RAM (2026-11-18)
     # App Platform's edge proxies reach the container from private
     # addresses. Verified 2026-11-18: Authentik logs the real client IP.
     AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS = "10.0.0.0/8,172.16.0.0/12,100.64.0.0/10"
