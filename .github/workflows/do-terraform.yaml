@@ -45,6 +45,7 @@ jobs:
           TF_API_TOKEN: op://GitHub/Terraform Cloud/credential
           CLOUDFLARE_API_TOKEN: op://GitHub/Cloudflare R2 Terraform/api_token
           CLOUDFLARE_ACCOUNT_ID: op://GitHub/Cloudflare R2 Terraform/account_id
+          DIGITALOCEAN_TOKEN: op://GitHub/DigitalOcean API Token/credential
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -67,6 +68,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ steps.op-secrets.outputs.CLOUDFLARE_API_TOKEN }}
           TF_VAR_cloudflare_account_id: ${{ steps.op-secrets.outputs.CLOUDFLARE_ACCOUNT_ID }}
+          DIGITALOCEAN_TOKEN: ${{ steps.op-secrets.outputs.DIGITALOCEAN_TOKEN }}
         run: terraform plan -no-color -input=false
 
       - name: Comment plan on PR
@@ -132,4 +134,5 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ steps.op-secrets.outputs.CLOUDFLARE_API_TOKEN }}
           TF_VAR_cloudflare_account_id: ${{ steps.op-secrets.outputs.CLOUDFLARE_ACCOUNT_ID }}
+          DIGITALOCEAN_TOKEN: ${{ steps.op-secrets.outputs.DIGITALOCEAN_TOKEN }}
         run: terraform apply -auto-approve -input=false
