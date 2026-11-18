@@ -175,6 +175,12 @@ resource "random_password" "authentik_bootstrap" {
 # --- Authentik ----------------------------------------------------------------
 
 resource "digitalocean_app" "authentik" {
+  # App-level env holds only SECRETs, which App Platform returns encrypted
+  # (see ENV VARS at the top).
+  lifecycle {
+    ignore_changes = [spec[0].env]
+  }
+
   spec {
     name   = "authentik"
     region = "nyc"
@@ -288,6 +294,12 @@ resource "digitalocean_app" "authentik" {
 # --- Fleet ----------------------------------------------------------------------
 
 resource "digitalocean_app" "fleet" {
+  # App-level env holds only SECRETs, which App Platform returns encrypted
+  # (see ENV VARS at the top).
+  lifecycle {
+    ignore_changes = [spec[0].env]
+  }
+
   spec {
     name   = "fleet"
     region = "nyc"
@@ -417,6 +429,12 @@ resource "digitalocean_app" "fleet" {
 # --- Backups --------------------------------------------------------------------
 
 resource "digitalocean_app" "backups" {
+  # App-level env holds only SECRETs, which App Platform returns encrypted
+  # (see ENV VARS at the top).
+  lifecycle {
+    ignore_changes = [spec[0].env]
+  }
+
   spec {
     name   = "backups"
     region = "nyc"
