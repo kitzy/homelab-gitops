@@ -1,8 +1,9 @@
 # Backup worker for the DigitalOcean app (component `backup`).
 #
 # App Platform builds this image from the repo (public, so no registry or
-# GitHub app is needed). It runs supercronic in the foreground; the jobs are
-# in crontab. See do/README.md.
+# GitHub app is needed). entrypoint.sh optionally runs the nightly job once,
+# then runs supercronic in the foreground; the jobs are in crontab. See
+# do/README.md.
 #
 # Tools:
 #   pg_dump 17   from the postgres base image (must be >= the server's major)
@@ -36,10 +37,11 @@ RUN set -eux; \
 COPY --from=restic /usr/bin/restic /usr/local/bin/restic
 COPY crontab /etc/backup/crontab
 COPY --chmod=0755 backup.sh /usr/local/bin/backup.sh
+COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Unprivileged. ("backup" is already a Debian system user.)
 RUN useradd --create-home --uid 10001 dbbackup && install -d -o dbbackup /dumps /cache
 USER dbbackup
 ENV RESTIC_CACHE_DIR=/cache
 
-CMD ["supercronic", "-passthrough-logs", "/etc/backup/crontab"]
+CMD ["/usr/local/bin/entrypoint.sh"]

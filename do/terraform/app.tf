@@ -20,6 +20,7 @@
 #     through the fleet app's default URL.
 #   - Domains are auth-do.kitzy.net and fleet-do.kitzy.net.
 #   - Healthchecks.io pings are off, so the rehearsal can't signal the VM's checks.
+#   - The backup worker runs its nightly job once on every deploy.
 #
 # App Platform notes:
 #   - run_command replaces the image's ENTRYPOINT, so Authentik's commands
@@ -430,6 +431,8 @@ resource "digitalocean_app" "backups" {
           RESTIC_REPOSITORY  = "s3:https://${var.cloudflare_account_id}.r2.cloudflarestorage.com/${cloudflare_r2_bucket.backups.name}"
           AWS_DEFAULT_REGION = "auto"
           RESTIC_HOST        = "homelab-do"
+          # Rehearsal: back up once on every deploy (see do/backup/entrypoint.sh).
+          BACKUP_RUN_ON_START = local.rehearsal ? "true" : "false"
         }
         content {
           key   = env.key
