@@ -6,8 +6,40 @@ Migration plan: https://claude.ai/artifact/J9V68fpDaSEizhRfW4ZU7H
 
 ## Status
 
-Phase 2 of the migration: only the R2 buckets exist. The App Platform app and
-the databases come in later PRs.
+Phase 4 of the migration (rehearsal). The databases, the R2 buckets and the
+App Platform app exist. The app runs on empty databases at
+auth-do.kitzy.net and fleet-do.kitzy.net (`local.rehearsal` in
+`terraform/app.tf`). Production stays on the Vultr VM until the cutover.
+
+## Components (app `homelab`, region nyc)
+
+| Component | Kind | Size |
+| --- | --- | --- |
+| `authentik-server` | service, port 9000 | apps-s-1vcpu-1gb-fixed |
+| `authentik-worker` | worker | apps-s-1vcpu-0.5gb |
+| `fleet` | service, port 8080 | apps-s-1vcpu-1gb-fixed |
+| `fleet-migrate` | PRE_DEPLOY job (`fleet prepare db`) | apps-s-1vcpu-0.5gb |
+| `redis` | internal service, port 6379 | apps-s-1vcpu-0.5gb |
+| `backup` | worker built from `do/backup/` | apps-s-1vcpu-0.5gb |
+
+Databases: `fleet-mysql` (MySQL 8.4, database and user `fleet`) and
+`authentik-pg` (PostgreSQL 17, database and user `authentik`), both
+db-s-1vcpu-1gb in nyc3, with daily backups and 7 days of point-in-time
+restore. Their firewalls admit the app, plus the Vultr VM until the cutover.
+
+## Database setup notes
+
+- **MySQL settings:** DigitalOcean may reset `sql_require_primary_key` and
+  `sql_mode` when it creates a cluster. After creating one, run a plan; if
+  `digitalocean_database_mysql_config` drifts, re-run the workflow
+  (`workflow_dispatch`) to apply it again.
+- **Postgres ownership:** `doadmin` owns new databases, and on Postgres 15+
+  only the owner can create tables in `public`. After creating the
+  database, as `doadmin`: `ALTER DATABASE authentik OWNER TO authentik;`
+  (done 2026-11-18).
+- **Restoring the Fleet dump:** strip the view's definer first. `doadmin`
+  lacks SET_ANY_DEFINER:
+  `sed -E 's#/\*!50013 DEFINER=`[^`]+`@`[^`]+` (SQL SECURITY [A-Z]+) \*/#/*!50013 \1 */#'`
 
 ## Terraform
 
@@ -21,6 +53,9 @@ Secrets come from the 1Password `GitHub` vault:
 | --- | --- |
 | `Terraform Cloud` | HCP state access |
 | `Cloudflare R2 Terraform` | R2 bucket management (Workers R2 Storage Read + Write only) |
+| `DigitalOcean API Token` | DigitalOcean (team Homelab) |
+| `homelab-do app secrets` | Fleet private key and license, Authentik secret key, restic password, Healthchecks URLs (copies of the Homelab vault values) |
+| `R2 backups homelab-do` | Backup worker's S3 keys, scoped to `kitzy-homelab-backups` |
 
 ## R2 buckets
 
