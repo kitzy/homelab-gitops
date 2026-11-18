@@ -12,12 +12,14 @@ on:
       - main
     paths:
       - 'do/terraform/**'
+      - 'do/backup/**'
       - '.github/workflows/do-terraform.yaml'
   push:
     branches:
       - main
     paths:
       - 'do/terraform/**'
+      - 'do/backup/**'
       - '.github/workflows/do-terraform.yaml'
   # Manual re-apply of main, e.g. to correct the database settings that
   # DigitalOcean resets when a cluster is created (see databases.tf).
@@ -37,6 +39,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # to tell whether do/backup/ changed in this push
 
       - name: Load secrets from 1Password
         id: op-secrets
@@ -156,3 +160,21 @@ jobs:
           TF_VAR_cloudflare_account_id: ${{ steps.op-secrets.outputs.CLOUDFLARE_ACCOUNT_ID }}
           DIGITALOCEAN_TOKEN: ${{ steps.op-secrets.outputs.DIGITALOCEAN_TOKEN }}
         run: terraform apply -auto-approve -input=false
+
+      # The backups app builds do/backup/ from git, but App Platform reuses its
+      # last build unless forced, even when Terraform redeploys the app.
+      - name: Rebuild the backup worker if do/backup changed
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+        env:
+          DIGITALOCEAN_TOKEN: ${{ steps.op-secrets.outputs.DIGITALOCEAN_TOKEN }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "${{ github.event_name }}" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] \
+             && git diff --quiet "$BEFORE" HEAD -- ../backup; then
+            echo "do/backup unchanged; no rebuild needed"
+            exit 0
+          fi
+          app_id=$(terraform output -raw backups_app_id)
+          curl -fsS -X POST -H "Authorization: Bearer $DIGITALOCEAN_TOKEN" -H "Content-Type: application/json" \
+            "https://api.digitalocean.com/v2/apps/$app_id/deployments" -d '{"force_build":true}' \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["deployment"]; print("Started forced rebuild", d["id"], d["phase"])'
