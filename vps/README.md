@@ -11,13 +11,13 @@ One Vultr VM runs Authentik and Fleet as Docker Compose stacks. [Doco-CD](https:
 | Admin access | Tailscale SSH to `homelab-vps` (`tag:vps`, check mode) |
 | Secrets | 1Password `Homelab` vault, read by Doco-CD with a read-only service account |
 | Backups | restic over SFTP to the Synology, nightly, monitored by Healthchecks.io |
-| Device management | The VM itself is enrolled in Fleet (fleetd, scripts enabled) |
+| Device management and hardening | The VM is enrolled in Fleet's Servers fleet; [`kitzy/fleet-gitops`](https://github.com/kitzy/fleet-gitops) enforces its hardening (see [Hardening](#hardening)) |
 
 ## The VM
 
 - Vultr High Performance, plan `vhp-4c-8gb-amd` (4 vCPU, 8 GB, 180 GB NVMe), region `ewr` (New Jersey), Ubuntu 24.04. About $48 a month. Public IP `45.77.154.196`, tailnet name `homelab-vps`.
 - The firewall group allows only UDP 41641 inbound (Tailscale direct connections). A Vultr firewall group with **no** rules allows everything, so that one rule is what makes it drop the rest. `sshd` is disabled; admin access is Tailscale SSH. Everything else is outbound: the Cloudflare Tunnel, Doco-CD polling GitHub, restic to the NAS, Fleet's agent.
-- Cloud-init installs Docker (with log rotation) and Tailscale, makes sure swap exists, enables unattended security upgrades (no automatic reboots), turns off `sshd`, joins the tailnet as `homelab-vps` with `tag:vps`, creates the `proxy` Docker network, and writes `/opt/doco-cd/compose.yaml`. It does not start Doco-CD. Vultr's Ubuntu image already ships an 8 GB `/swapfile`, so that is what the VM has.
+- Cloud-init installs Docker (with log rotation) and Tailscale, makes sure swap exists, enables daily unattended upgrades, turns off `sshd`, locks root's password, removes Vultr's `linuxuser`, joins the tailnet as `homelab-vps` with `tag:vps`, creates the `proxy` Docker network, and writes `/opt/doco-cd/compose.yaml`. It does not start Doco-CD. Vultr's Ubuntu image already ships an 8 GB `/swapfile`, so that is what the VM has.
 - `prevent_destroy` is set on the instance. Every Docker volume, so every database, lives on the VM disk, and a replace would destroy them. Terraform also ignores changes to `user_data` and `os_id`, so editing cloud-init never forces a replace. Cloud-init changes only apply to a newly built VM.
 - Optional, off by default: Vultr automatic backups (`enable_vultr_backups`) and a block storage volume for `/var/lib/docker` (`docker_volume_size_gb`, only takes effect when the VM is first created).
 - Memory: about 3.2 GB of 7.7 GB in use with everything running (2026-11-17), swap untouched. If `docker stats` shows sustained use above about 6.5 GB, move to the 16 GB plan (about $81 a month) by changing `plan` in [`terraform/variables.tf`](terraform/variables.tf). A plan resize is an in-place change on Vultr. Read the Terraform plan before merging to make sure it says update, not replace.
@@ -93,10 +93,12 @@ The `backup` stack ([`compose/backup/compose.yaml`](../compose/backup/compose.ya
 
 | Time | Job | What it does |
 | --- | --- | --- |
-| 02:00 | `dump-fleet` | `mysqldump` (Oracle client, `mysql:8.0.46`) of `fleet`. Fails and deletes the dump unless it has at least 100 tables and includes `users`, `migration_status_tables`, and `hosts`. |
-| 02:10 | `dump-authentik` | `pg_dump` 17, plain format. Fails unless the dump has pg_dump's completion footer. |
-| 03:00 | `restic-backup` | Fails if any dump is missing or more than 3 hours old. Otherwise it snapshots `backup_dumps` and the `authentik_media` volume, then runs `forget --keep-daily 7 --keep-weekly 4 --keep-monthly 3 --prune`. On its very first run it creates the repository (only when restic reports that none exists, never on a connection or auth error). |
-| Sun 05:00 | `restic-check` | `restic check`. |
+| 23:00 | `dump-fleet` | `mysqldump` (Oracle client, `mysql:8.0.46`) of `fleet`. Fails and deletes the dump unless it has at least 100 tables and includes `users`, `migration_status_tables`, and `hosts`. |
+| 23:10 | `dump-authentik` | `pg_dump` 17, plain format. Fails unless the dump has pg_dump's completion footer. |
+| 23:30 | `restic-backup` | Fails if any dump is missing or more than 3 hours old. Otherwise it snapshots `backup_dumps` and the `authentik_media` volume, then runs `forget --keep-daily 7 --keep-weekly 4 --keep-monthly 3 --prune`. On its very first run it creates the repository (only when restic reports that none exists, never on a connection or auth error). |
+| Sun 21:00 | `restic-check` | `restic check`. |
+
+The jobs run before the unattended-upgrades reboot window (01:00–05:00 Eastern, see [Hardening](#hardening)), so a patch reboot cannot cut a backup off halfway.
 
 - Repository: `sftp:restic@10.253.20.10:/backups/homelab-vps`, over the Tailscale subnet route. `tag:vps` may reach only `10.253.20.10:22`. The NAS host key is pinned in the compose file.
 - Healthchecks.io checks `backup_ping` (daily) and `check_ping` (weekly) get a ping on start, success, and failure. A failed dump leaves the previous dump in place, so the restic job sees a stale file and pings `/fail`. If Doco-CD or the VM is down, nothing pings, and Healthchecks.io alerts on the missed schedule.
@@ -224,6 +226,27 @@ Restoring Authentik and Fleet onto a new VM from the restic backups. This follow
 4. **Start the apps:** set `profiles: [app]` again and merge. Watch `docker logs fleet-fleet-migrate-1` and the Authentik server logs. Fleet needs the same `FLEET_SERVER_PRIVATE_KEY` the data was written with. If it is wrong, Fleet crash-loops with `decrypting mdm config asset ... message authentication failed`.
 5. **Verify:** `https://fleet.kitzy.net/healthz` and `https://auth.kitzy.net/-/health/ready/` return 200, Fleet hosts check in, an SSO login works. Delete `/root/restore-drill`.
 
+## Hardening
+
+The VM's operating-system hardening is enforced by Fleet, not by hand. [`kitzy/fleet-gitops`](https://github.com/kitzy/fleet-gitops) defines it as policies that each run a remediation script when they fail. The VM is in the **Servers** fleet and matches the `homelab-vps` label (hostname).
+
+| What | Where it comes from |
+| --- | --- |
+| Daily unattended upgrades, including non-security updates, with automatic reboots. The reboot window is 06:00 UTC plus up to 4 h randomized, i.e. 01:00–05:00 Eastern | Servers fleet patching policies (`os-patching.policies.yml`) |
+| Docker Engine updates from Docker's apt repo, and `live-restore` so a Docker upgrade does not restart the containers | `homelab-vps-hardening.policies.yml` |
+| `sshd` disabled; admin access is Tailscale SSH | `homelab-vps-hardening.policies.yml` |
+| Root password locked (Vultr sets one, and Terraform keeps it in state) | `homelab-vps-hardening.policies.yml` |
+| No login accounts besides root (Vultr's `linuxuser` removed) | `homelab-vps-hardening.policies.yml` |
+| No ICMP redirects sent, martian packets logged. IP forwarding (Docker) and loose `rp_filter` (Tailscale) are left as they are | `homelab-vps-hardening.policies.yml` |
+| Alert if anything listens on TCP in the host network namespace outside loopback and Tailscale | `homelab-vps-hardening.policies.yml` (alert only) |
+| No inbound TCP; UDP 41641 only (Tailscale) | Vultr firewall, [`terraform/main.tf`](terraform/main.tf) |
+
+The `homelab-vps` label also excludes the VM from the Servers fleet's SSH user baseline, which would otherwise create a passwordless-sudo user for SSH that this VM does not use.
+
+Cloud-init applies the same settings to a newly built VM (`live-restore`, root locked, `linuxuser` removed, `sshd` off), so the policies pass from the start. Fleet remains the enforcer.
+
+Not done, on purpose: `no-new-privileges` for every container (the MySQL and Postgres images drop privileges at startup and break with it), auditd (osquery through Fleet covers most of that), and Vultr automatic backups (restic covers the data).
+
 ## Migration history
 
 In November 2026 the Proxmox cluster went down, and the apps moved from K3s to this VM. The cluster went offline about 2026-11-13. The VM went live and DNS was cut over on 2026-11-17, with data restored from the last nightly dumps (2026-11-13). Scanopy was dropped as unused.
@@ -244,4 +267,4 @@ Findings worth keeping:
 - Fleet's agent runs with scripts enabled. Fleet admin access is therefore root access to this VM, and through Docker to every database on it.
 - The Tailscale bootstrap key is in the instance `user_data`, which the Vultr metadata service serves to anything on the VM. It is single-use and expires an hour after it is minted.
 - No public inbound TCP ports. Admin access is Tailscale SSH only (check mode).
-- Rotate the 1Password service account token, the Vultr API key, and the Fleet enroll secret if the VM is rebuilt or suspected compromised.
+- Rotate the 1Password service account token, the Vultr API key, and the Servers fleet enroll secret (`GitHub/FleetSecrets` in 1Password, applied by fleet-gitops) if the VM is rebuilt or suspected compromised.
