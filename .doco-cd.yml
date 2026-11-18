@@ -25,7 +25,9 @@ external_secrets:
 ---
 name: authentik
 working_dir: compose/authentik
-profiles: [app]
+# Cutover to DigitalOcean (2026-11-18): no `app` profile, so Doco-CD no
+# longer starts Authentik here. The database keeps running as the rollback.
+profiles: []
 timeout: 10m # first boot after a restore runs migrations; start_period is 300 s
 external_secrets:
   AUTHENTIK_PG_DB: op://Homelab/authentik-secrets/POSTGRES_DB
@@ -38,7 +40,8 @@ external_secrets:
 ---
 name: fleet
 working_dir: compose/fleet
-profiles: [app]
+# Cutover to DigitalOcean (2026-11-18): see the authentik note above.
+profiles: []
 timeout: 10m # fleet prepare db can take a while on a large database
 external_secrets:
   MYSQL_ROOT_PASSWORD: op://Homelab/Fleet Secrets/MYSQL_ROOT_PASSWORD
@@ -54,8 +57,11 @@ name: backup
 working_dir: compose/backup
 # Gates the cd.doco.job.* schedules. Set to "true" once the restore is done,
 # the restic repository is initialized, and the Healthchecks.io checks exist.
+# Off since the cutover to DigitalOcean (2026-11-18): the VM's databases are
+# frozen at the final dump, and the DigitalOcean backups worker now pings
+# the same Healthchecks.io checks.
 environment:
-  BACKUP_JOBS_ENABLED: "true"
+  BACKUP_JOBS_ENABLED: "false"
 external_secrets:
   FLEET_MYSQL_ROOT_PASSWORD: op://Homelab/Fleet Secrets/MYSQL_ROOT_PASSWORD
   AUTHENTIK_PG_DB: op://Homelab/authentik-secrets/POSTGRES_DB
