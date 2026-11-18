@@ -50,6 +50,21 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: op://GitHub/Cloudflare R2 Terraform/account_id
           DIGITALOCEAN_TOKEN: op://GitHub/DigitalOcean API Token/credential
 
+      - name: Load app secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          TF_VAR_fleet_server_private_key: op://GitHub/homelab-do app secrets/FLEET_SERVER_PRIVATE_KEY
+          TF_VAR_fleet_license_key: op://GitHub/homelab-do app secrets/FLEET_LICENSE_KEY
+          TF_VAR_authentik_secret_key: op://GitHub/homelab-do app secrets/AUTHENTIK_SECRET_KEY
+          TF_VAR_restic_password: op://GitHub/homelab-do app secrets/RESTIC_PASSWORD
+          TF_VAR_hc_backup_url: op://GitHub/homelab-do app secrets/HC_BACKUP_URL
+          TF_VAR_hc_check_url: op://GitHub/homelab-do app secrets/HC_CHECK_URL
+          TF_VAR_r2_backups_access_key_id: op://GitHub/R2 backups homelab-do/AWS_ACCESS_KEY_ID
+          TF_VAR_r2_backups_secret_access_key: op://GitHub/R2 backups homelab-do/AWS_SECRET_ACCESS_KEY
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:

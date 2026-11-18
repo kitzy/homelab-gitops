@@ -10,3 +10,8 @@ output "r2_buckets" {
     backups          = cloudflare_r2_bucket.backups.name
   }
 }
+
+output "app_default_url" {
+  description = "The app's default *.ondigitalocean.app URL. DNS CNAMEs for the app's domains point at its host."
+  value       = digitalocean_app.homelab.default_ingress
+}

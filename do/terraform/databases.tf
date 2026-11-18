@@ -8,7 +8,7 @@ locals {
   db_region = "nyc3"
 
   # Trusted sources while the data is loaded from the Vultr VM. Removed after
-  # the cutover. The app is added as a trusted source when it exists.
+  # the cutover. The app (app.tf) is the permanent trusted source.
   migration_source_ips = ["45.77.154.196"]
 }
 
@@ -50,10 +50,20 @@ resource "digitalocean_database_db" "fleet" {
 resource "digitalocean_database_user" "fleet" {
   cluster_id = digitalocean_database_cluster.fleet_mysql.id
   name       = "fleet"
+
+  # The provider reports an empty settings block as drift.
+  lifecycle {
+    ignore_changes = [settings]
+  }
 }
 
 resource "digitalocean_database_firewall" "fleet_mysql" {
   cluster_id = digitalocean_database_cluster.fleet_mysql.id
+
+  rule {
+    type  = "app"
+    value = digitalocean_app.homelab.id
+  }
 
   dynamic "rule" {
     for_each = local.migration_source_ips
@@ -91,10 +101,20 @@ resource "digitalocean_database_db" "authentik" {
 resource "digitalocean_database_user" "authentik" {
   cluster_id = digitalocean_database_cluster.authentik_pg.id
   name       = "authentik"
+
+  # The provider reports an empty settings block as drift.
+  lifecycle {
+    ignore_changes = [settings]
+  }
 }
 
 resource "digitalocean_database_firewall" "authentik_pg" {
   cluster_id = digitalocean_database_cluster.authentik_pg.id
+
+  rule {
+    type  = "app"
+    value = digitalocean_app.homelab.id
+  }
 
   dynamic "rule" {
     for_each = local.migration_source_ips
