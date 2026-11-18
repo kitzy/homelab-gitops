@@ -11,7 +11,10 @@ output "r2_buckets" {
   }
 }
 
-output "app_default_url" {
-  description = "The app's default *.ondigitalocean.app URL. DNS CNAMEs for the app's domains point at its host."
-  value       = digitalocean_app.homelab.default_ingress
+output "app_default_urls" {
+  description = "Default *.ondigitalocean.app URLs. The DNS CNAMEs for each app's domain point at its host."
+  value = {
+    authentik = digitalocean_app.authentik.default_ingress
+    fleet     = digitalocean_app.fleet.default_ingress
+  }
 }
