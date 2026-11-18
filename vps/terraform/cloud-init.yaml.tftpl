@@ -28,11 +28,13 @@ write_files:
         "log-opts": {
           "max-size": "10m",
           "max-file": "3"
-        }
+        },
+        "live-restore": true
       }
 
-  # Security updates only, applied daily. No automatic reboot: the databases
-  # run here, so reboots stay manual.
+  # Daily unattended updates. After enrollment, Fleet (fleet-gitops, Servers
+  # fleet) adds general updates, Docker's repo, and automatic reboots in the
+  # 01:00-05:00 Eastern window; the nightly backups run before it.
   - path: /etc/apt/apt.conf.d/20auto-upgrades
     permissions: "0644"
     content: |
@@ -142,6 +144,12 @@ runcmd:
   # Admin access is Tailscale SSH, which does not use sshd. Turn sshd off so
   # nothing listens on the public interface even if the firewall is changed.
   - systemctl disable --now ssh.socket ssh.service
+
+  # Nothing logs in with a password, and Vultr's image ships an extra sudo
+  # user. Fleet enforces both after enrollment (fleet-gitops, homelab-vps
+  # policies); doing it here keeps a rebuilt VM clean from the start.
+  - passwd -l root
+  - id linuxuser >/dev/null 2>&1 && userdel -r linuxuser || true
 
   # Shared network for cloudflared and the apps' HTTP services.
   - docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
