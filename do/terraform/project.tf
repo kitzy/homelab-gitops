@@ -8,16 +8,14 @@ import {
 
 resource "digitalocean_project" "homelab" {
   name        = "homelab"
-  description = "Homelab services: Authentik, Fleet and backups (kitzy/homelab-gitops do/terraform)"
+  description = "Homelab services: Fleet and backups (kitzy/homelab-gitops do/terraform)"
   purpose     = "Service or API"
   environment = "Production"
   is_default  = true
 
   resources = [
-    digitalocean_app.authentik.urn,
     digitalocean_app.fleet.urn,
     digitalocean_app.backups.urn,
     digitalocean_database_cluster.fleet_mysql.urn,
-    digitalocean_database_cluster.authentik_pg.urn,
   ]
 }

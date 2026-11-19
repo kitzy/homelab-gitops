@@ -22,9 +22,5 @@ terraform {
       source  = "digitalocean/digitalocean"
       version = "~> 2.108"
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.9"
-    }
   }
 }

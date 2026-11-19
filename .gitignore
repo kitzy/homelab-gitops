@@ -1,1 +1,7 @@
 .claude/
+
+# Terraform working directories and local state never belong in git, whatever
+# the per-root .gitignore files say.
+.terraform/
+*.tfstate
+*.tfstate.backup

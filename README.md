@@ -8,21 +8,19 @@ This repository is the single source of truth for the homelab. Each top-level di
 
 | Directory | Domain | Status |
 |-----------|--------|--------|
-| [`do/`](do/) | Authentik, Fleet, and backups on DigitalOcean App Platform with managed MySQL and Postgres, plus Cloudflare R2, via Terraform on HCP | Active |
-| [`authentik/`](authentik/) | Authentik configuration (applications, providers, sources, login flows) via Terraform on HCP | Active |
+| [`do/`](do/) | Fleet and its backups on DigitalOcean App Platform with managed MySQL, plus Cloudflare R2, via Terraform on HCP | Active |
 | [`tailscale/`](tailscale/) | Tailnet config (ACLs, DNS, keys) via Terraform on HCP | Active |
 | [`dns/`](dns/) | Public DNS (Route53 + Cloudflare zones) via Terraform on HCP | Active |
 | `proxmox/` | Proxmox VMs as code (Terraform) | Planned |
 | `docker/` | Standalone Docker container configs | Planned |
 
-History, all November 2026 and all still in the git history: the K3s cluster and Flux (`kubernetes/`) gave way to a Vultr VM running Docker Compose with Doco-CD (`compose/`, `vps/`), which gave way on 18 November to DigitalOcean App Platform (`do/`).
+History, all November 2026 and all still in the git history: the K3s cluster and Flux (`kubernetes/`) gave way to a Vultr VM running Docker Compose with Doco-CD (`compose/`, `vps/`), which gave way on 18 November to DigitalOcean App Platform (`do/`). Authentik (`authentik/`) was retired on 19 November: Fleet's SSO and IdP data come straight from Google Workspace (`google/`).
 
 ## How changes ship
 
 | Change | What happens |
 |--------|--------------|
 | `do/terraform/**` or `do/backup/**` | Plan on the PR, apply on merge, which redeploys the affected App Platform apps; changes to `do/backup/` also force a rebuild of the backup worker ([`do-terraform.yaml`](.github/workflows/do-terraform.yaml)). |
-| `authentik/terraform/**` | Plan on the PR, apply on merge ([`authentik-terraform.yaml`](.github/workflows/authentik-terraform.yaml)). |
 | `tailscale/**` | Plan on the PR, apply on merge ([`tailscale-terraform.yaml`](.github/workflows/tailscale-terraform.yaml)). |
 | `dns/**` | Validate and plan on the PR, apply on merge ([`dns-validate.yaml`](.github/workflows/dns-validate.yaml), [`dns-sync.yaml`](.github/workflows/dns-sync.yaml)). |
 
@@ -33,7 +31,6 @@ Image versions in `do/terraform/app.tf` and `do/backup/Dockerfile` are pinned. R
 ## Where to look
 
 - **The apps, databases, updates, backups, and disaster recovery:** [`do/README.md`](do/README.md)
-- **Authentik configuration:** [`authentik/README.md`](authentik/README.md)
 - **Tailnet policy and setup:** [`tailscale/README.md`](tailscale/README.md)
 - **DNS zones and tunnel records:** [`dns/README.md`](dns/README.md)
 

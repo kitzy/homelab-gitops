@@ -8,15 +8,13 @@ output "r2_buckets" {
   value = {
     fleet_installers = cloudflare_r2_bucket.fleet_installers.name
     backups          = cloudflare_r2_bucket.backups.name
-    authentik_files  = cloudflare_r2_bucket.authentik_files.name
   }
 }
 
 output "app_default_urls" {
   description = "Default *.ondigitalocean.app URLs. The DNS CNAMEs for each app's domain point at its host."
   value = {
-    authentik = digitalocean_app.authentik.default_ingress
-    fleet     = digitalocean_app.fleet.default_ingress
+    fleet = digitalocean_app.fleet.default_ingress
   }
 }
 

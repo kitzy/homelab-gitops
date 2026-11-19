@@ -16,10 +16,6 @@ variable "fleet_license_key" {
   sensitive = true
 }
 
-variable "authentik_secret_key" {
-  type      = string
-  sensitive = true
-}
 
 variable "restic_password" {
   type      = string
@@ -57,13 +53,4 @@ variable "fleet_r2_secret_access_key" {
   sensitive = true
 }
 
-variable "authentik_r2_access_key" {
-  description = "S3 key pair scoped to the kitzy-authentik-files R2 bucket (op://GitHub/R2 authentik homelab-do)."
-  type        = string
-  sensitive   = true
-}
 
-variable "authentik_r2_secret_key" {
-  type      = string
-  sensitive = true
-}
