@@ -7,7 +7,7 @@ terraform {
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 4.0"
+      version = "~> 5.29"
     }
   }
   cloud {
@@ -279,22 +279,37 @@ resource "aws_route53_record" "this" {
 
 # Cloudflare Zone Resources
 resource "cloudflare_zone" "this" {
-  for_each   = local.cloudflare_zones
-  zone       = each.value.zone_name
-  account_id = var.CLOUDFLARE_ACCOUNT_ID
+  for_each = local.cloudflare_zones
+  name     = each.value.zone_name
+  account = {
+    id = var.CLOUDFLARE_ACCOUNT_ID
+  }
 }
 
 # Cloudflare Record Resources (simple routing only)
-resource "cloudflare_record" "this" {
+# Names are full hostnames: the v5 provider stores the FQDN the API returns.
+resource "cloudflare_dns_record" "this" {
   for_each = local.cloudflare_record_map
 
   zone_id  = cloudflare_zone.this[each.value.zone_name].id
-  name     = each.value.name == each.value.zone_name ? "@" : each.value.name
+  name     = each.value.name == each.value.zone_name ? each.value.zone_name : "${each.value.name}.${each.value.zone_name}"
   type     = each.value.type
   ttl      = each.value.ttl
   content  = each.value.content
   priority = each.value.priority
   proxied  = each.value.proxied
+}
+
+# Provider v5 renamed cloudflare_record to cloudflare_dns_record. These move
+# the existing records in state instead of destroying and recreating them.
+moved {
+  from = cloudflare_record.this
+  to   = cloudflare_dns_record.this
+}
+
+moved {
+  from = cloudflare_record.tunnel
+  to   = cloudflare_dns_record.tunnel
 }
 
 # Cloudflare Tunnel Configuration Resources
@@ -307,35 +322,28 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "this" {
   account_id = var.CLOUDFLARE_ACCOUNT_ID
   tunnel_id  = each.key
 
-  config {
-    # Create an ingress rule for each hostname using this tunnel
-    dynamic "ingress_rule" {
-      for_each = each.value.ingress_rules
-      content {
-        hostname = ingress_rule.value.hostname
-        service  = ingress_rule.value.service
-        dynamic "origin_request" {
-          for_each = ingress_rule.value.ca_pool != null ? [1] : []
-          content {
-            ca_pool = ingress_rule.value.ca_pool
-          }
+  config = {
+    # An ingress rule for each hostname using this tunnel, then the required
+    # catch-all for traffic that doesn't match any hostname.
+    ingress = concat(
+      [
+        for rule in each.value.ingress_rules : {
+          hostname       = rule.hostname
+          service        = rule.service
+          origin_request = rule.ca_pool != null ? { ca_pool = rule.ca_pool } : null
         }
-      }
-    }
-
-    # Required catch-all rule for traffic that doesn't match any hostname
-    ingress_rule {
-      service = "http_status:404"
-    }
+      ],
+      [{ service = "http_status:404" }]
+    )
   }
 }
 
 # Create CNAME records for tunnel hostnames
-resource "cloudflare_record" "tunnel" {
+resource "cloudflare_dns_record" "tunnel" {
   for_each = local.tunnel_cname_map
 
   zone_id = cloudflare_zone.this[each.value.zone_name].id
-  name    = each.value.hostname == each.value.zone_name ? "@" : split(".${each.value.zone_name}", each.value.hostname)[0]
+  name    = each.value.hostname
   type    = "CNAME"
   content = "${each.value.tunnel_id}.cfargotunnel.com"
   ttl     = 1
