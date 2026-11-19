@@ -15,12 +15,12 @@ back anything managed here that was changed by hand.
 | `fleet.tf` | Fleet (Admin) SAML application and provider; Fleet SCIM application and provider |
 | `sources.tf` | Google OAuth source; Google Workspace LDAP source and its 8 property mappings |
 | `flows.tf` | Login routing: `auth-router` (the brand's login flow) sends `/if/admin` requests to `admin-authentication-flow` (identify, then MFA) and everyone else to `auth-user-google`; `auth-admin-local` is a local admin login with MFA. Their stages, stage bindings, expression policies and policy bindings |
-| `groups.tf` | `authentik Admins`, `Synology NAS`, `test` (membership is not managed) |
+| `groups.tf` | `authentik Admins` (membership is not managed). Groups from Google Workspace (`Synology NAS`, `test`, `Amazon Web Services`) belong to the LDAP sync, not Terraform |
 | `brand.tf` | The default brand's flows |
 | `data.tf` | Built-in objects referred to but not managed: default flows and stages, SAML/SCIM property mappings, the `saml-signing` certificate |
 | `imports.tf` | How each object was adopted from the running Authentik (2026-11-19) |
 
-Not managed: users, Authentik's built-in default flows/stages/policies (they
+Not managed: users, groups synced from Google LDAP, Authentik's built-in default flows/stages/policies (they
 come from Authentik's own blueprints), certificates (no key material in the
 config), the embedded outpost.
 
