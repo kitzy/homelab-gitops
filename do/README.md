@@ -1,15 +1,14 @@
 # do/
 
 DigitalOcean App Platform, managed databases, and Cloudflare R2 for the
-homelab. This replaces the Vultr VM in `vps/` once the migration is done.
-Migration plan: https://claude.ai/artifact/J9V68fpDaSEizhRfW4ZU7H
+homelab: Authentik (auth.kitzy.net), Fleet (fleet.kitzy.net), and their
+backups. Everything here is Terraform; nothing is changed by hand.
+Migration plan and history: https://claude.ai/artifact/J9V68fpDaSEizhRfW4ZU7H
 
 ## Status
 
-Phase 4 of the migration (rehearsal). The databases, the R2 buckets and the
-App Platform app exist. The app runs on empty databases at
-auth-do.kitzy.net and fleet-do.kitzy.net (`local.rehearsal` in
-`terraform/app.tf`). Production stays on the Vultr VM until the cutover.
+In production since the cutover on 2026-11-18 (`local.rehearsal = false` in
+`terraform/app.tf`). The Vultr VM was decommissioned on 2026-11-19.
 
 ## Apps (region nyc)
 
@@ -27,8 +26,8 @@ Three App Platform apps, so each deploys, fails and rolls back on its own.
 Databases: `fleet-mysql` (MySQL 8.4, database and user `fleet`) and
 `authentik-pg` (PostgreSQL 17, database and user `authentik`), both
 db-s-1vcpu-1gb in nyc3, with daily backups and 7 days of point-in-time
-restore. Each firewall admits the apps that use that database (`backups`
-uses both), plus the Vultr VM until the cutover.
+restore. Each firewall admits only the apps that use that database
+(`backups` uses both).
 
 ## Database setup notes
 
@@ -81,3 +80,48 @@ outside Terraform, because creating tokens needs a permission that could mint
 a token with any access. Those tokens live in 1Password.
 
 S3 endpoint: `https://<account-id>.r2.cloudflarestorage.com`, region `auto`.
+
+## Updates
+
+Renovate opens a PR per image update (`renovate.json`): Fleet follows the
+release-candidate channel, everything else stable releases. Merging the PR
+applies it.
+
+- **Authentik must go one release line at a time** (2026.2 -> 2026.5 ->
+  2026.8 ...). Skipping a line makes it crash-loop with `Major version skips
+  are not allowed` (the check runs before migrations, so reverting is safe).
+  Renovate opens one PR per line; merge the oldest first and wait until
+  Authentik is healthy. Year changes wait for approval on the Dependency
+  Dashboard: step through each line of the new year by hand.
+- **Fleet** migrates its database in the `fleet-migrate` pre-deploy job
+  before the new version serves traffic.
+- **Backup worker** (`do/backup/Dockerfile`): the workflow forces a rebuild
+  when `do/backup/` changes; App Platform otherwise reuses the old build.
+
+## Backups
+
+| Layer | What | Restore with |
+| --- | --- | --- |
+| DigitalOcean managed backups | Daily, 7 days of point-in-time restore, both clusters | DigitalOcean console or API: fork/restore to a point in time. Tested in Phase 3 (Fleet's table without a primary key restores fine). |
+| restic to R2 | Nightly 23:00 ET: dumps of both databases to `kitzy-homelab-backups`; 7 daily, 4 weekly, 3 monthly; `restic check` Sundays 21:00 ET; Healthchecks.io pings | Below |
+| NAS archive (read-only) | The Vultr era's restic repository, `sftp:nas:/backups/homelab-vps`, including the cutover state as snapshot `8ac46124` (tag `cutover-final`) | restic with the `restic homelab-vps` 1Password item |
+
+### Restoring from R2
+
+1. Get the repository settings from 1Password: `homelab-do app secrets`
+   (`RESTIC_PASSWORD`) and `R2 backups homelab-do` (S3 keys). Repository:
+   `s3:https://<account-id>.r2.cloudflarestorage.com/kitzy-homelab-backups`,
+   region `auto`.
+2. `restic restore latest --host homelab-do --target <dir>` gives
+   `dumps/fleet.sql` and `dumps/authentik.sql`.
+3. Load them as in the cutover: firewall the apps out (or take them down),
+   end their sessions, reset the database, then
+   - Fleet: strip the view definer (see Database setup notes) and pipe into
+     `mysql` as user `fleet`, `--ssl-mode=VERIFY_IDENTITY`.
+   - Authentik: as user `authentik`, `DROP SCHEMA template CASCADE; DROP
+     SCHEMA public CASCADE; CREATE SCHEMA public;`, then `psql -v
+     ON_ERROR_STOP=1 < authentik.sql`.
+4. Redeploy both apps. A restore drill on 2026-11-18 matched every table.
+
+Never let Authentik start on a half-loaded or half-migrated database: its
+next boot can deadlock in migrations. Reset the schema and load again.

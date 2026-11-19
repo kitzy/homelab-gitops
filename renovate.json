@@ -1,32 +1,37 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["docker-compose"],
-  "docker-compose": {
-    "managerFilePatterns": ["/^compose/[^/]+/compose\\.ya?ml$/"]
+  "enabledManagers": ["custom.regex", "dockerfile"],
+  "dockerfile": {
+    "managerFilePatterns": ["/^do/backup/Dockerfile$/"]
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "App Platform image tags in do/terraform/app.tf, each annotated with a `# renovate: datasource=... depName=...` comment on the line above.",
+      "managerFilePatterns": ["/^do/terraform/app\\.tf$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*tag\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ]
+    }
+  ],
   "packageRules": [
     {
       "description": "Everything except Fleet: stable releases only (no RC, beta, or other prerelease tags).",
-      "matchManagers": ["docker-compose"],
       "matchPackageNames": ["!fleetdm/fleet"],
       "ignoreUnstable": true
     },
     {
-      "description": "Fleet follows the release-candidate channel: the newest of stable (vX.Y.Z) and RC (rc-minor-fleet-vX.Y.Z / rc-patch-fleet-vX.Y.Z) tags. RCs count as prereleases of the same version, so a stable release supersedes its own RC. Docker Hub's `latest` tag follows stable only, so respectLatest is off or it would cap updates at the latest stable and hide newer RCs. RC tags are rebuilt in place, so digests are pinned to catch re-pushes.",
-      "matchManagers": ["docker-compose"],
+      "description": "Fleet follows the release-candidate channel: the newest of stable (vX.Y.Z) and RC (rc-minor-fleet-vX.Y.Z / rc-patch-fleet-vX.Y.Z) tags. RCs count as prereleases of the same version, so a stable release supersedes its own RC. Docker Hub's `latest` tag follows stable only, so respectLatest is off or it would cap updates at the latest stable and hide newer RCs. The fleet-migrate pre-deploy job migrates the database before the new version serves traffic.",
       "matchPackageNames": ["fleetdm/fleet"],
-      "enabled": true,
       "versioning": "regex:^(?:(?<prerelease>rc)-(?:minor|patch)-fleet-)?v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
       "ignoreUnstable": false,
       "respectLatest": false,
-      "pinDigests": true,
       "commitMessageTopic": "Fleet",
       "labels": ["fleet"]
     },
     {
-      "description": "Authentik refuses to start if a release line (2025.10, 2025.12, 2026.2, ...) is skipped. Within a year, one PR per release line; merge them oldest first, one at a time. Year changes (Renovate major) cannot be split per line, and would offer the new year's newest line, so they wait for approval on the Dependency Dashboard: step through each line of the new year by hand.",
-      "matchManagers": ["docker-compose"],
+      "description": "Authentik refuses to start if a release line (2026.2, 2026.5, 2026.8, ...) is skipped. Within a year, one PR per release line; merge them oldest first, one at a time. Year changes (Renovate major) cannot be split per line, and would offer the new year's newest line, so they wait for approval on the Dependency Dashboard: step through each line of the new year by hand.",
       "matchPackageNames": ["ghcr.io/goauthentik/server"],
       "separateMultipleMajor": true,
       "separateMultipleMinor": true,
@@ -34,23 +39,15 @@
         "dependencyDashboardApproval": true
       },
       "labels": ["authentik"],
-      "prBodyNotes": ["**Authentik upgrades must go one release line at a time.** If another Authentik PR for an older release line is open, merge that one first and wait until Authentik is healthy. Skipping a line makes Authentik crash-loop with `Major version skips are not allowed` (see vps/README.md, Updates)."]
+      "prBodyNotes": ["**Authentik upgrades must go one release line at a time.** If another Authentik PR for an older release line is open, merge that one first and wait until Authentik is healthy. Skipping a line makes Authentik crash-loop with `Major version skips are not allowed` (see do/README.md, Updates)."]
     },
     {
-      "description": "Fleet's MySQL stays on 8.0. 8.4 and 9.x change defaults and need a planned upgrade.",
-      "matchManagers": ["docker-compose"],
-      "matchPackageNames": ["mysql"],
-      "allowedVersions": "/^8\\.0\\./"
-    },
-    {
-      "description": "Postgres major upgrades need a dump and restore, so stay on 17.",
-      "matchManagers": ["docker-compose"],
+      "description": "The backup worker's pg_dump must be at least the server's major version, and the managed cluster runs PostgreSQL 17. Raise both together.",
       "matchPackageNames": ["postgres"],
       "allowedVersions": "<18"
     },
     {
       "description": "Redis stays on 7.x.",
-      "matchManagers": ["docker-compose"],
       "matchPackageNames": ["redis"],
       "allowedVersions": "<8"
     }

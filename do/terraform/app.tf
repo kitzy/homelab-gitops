@@ -56,15 +56,18 @@ locals {
     fleet     = "fleet.kitzy.net"
   }
 
+  # Image tags: Renovate reads the `# renovate:` comments (renovate.json).
   fleet_image = {
     registry   = "fleetdm"
     repository = "fleet"
-    tag        = "v4.95.0"
+    # renovate: datasource=docker depName=fleetdm/fleet
+    tag = "v4.95.0"
   }
   authentik_image = {
     registry   = "goauthentik"
     repository = "server"
-    tag        = "2026.8.5"
+    # renovate: datasource=docker depName=ghcr.io/goauthentik/server
+    tag = "2026.8.5"
   }
 
   # Writes the CA to a file and execs the command. Runs under /bin/sh.
@@ -362,7 +365,8 @@ resource "digitalocean_app" "fleet" {
         registry_type = "DOCKER_HUB"
         registry      = "library"
         repository    = "redis"
-        tag           = "7.4.12-alpine"
+        # renovate: datasource=docker depName=redis
+        tag = "7.4.12-alpine"
       }
     }
 
