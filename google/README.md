@@ -22,10 +22,13 @@ The project itself was created by hand (2026-11-19): creating projects needs
 organization rights that CI should not hold. The first apply ran locally as
 a super admin to create the CI identity; every apply since runs in CI.
 
-## Not manageable as code
+## Fleet and Google Workspace
 
-Google publishes no API for these, so they are configured in the Admin
-console. The exact values are kept here.
+Fleet's admin sign-in and its IdP host vitals (full name, groups,
+department) come from Google Workspace. Two pieces are configured in the
+Google Admin console, because Google publishes no API for them; their exact
+values are kept here. The Fleet side is code in
+[kitzy/fleet-gitops](https://github.com/kitzy/fleet-gitops) (`default.yml`).
 
 ### Fleet admin SSO: custom SAML app
 
@@ -42,9 +45,14 @@ Admin console > Apps > Web and mobile apps > Add app > Add custom SAML app.
 | Name ID | Basic Information > Primary email |
 | Attribute mapping | none required: Fleet users already exist; their emails must match Google primary emails |
 | User access | ON for everyone (Fleet only admits users that exist in Fleet) |
+| Certificate | The IdP certificate created 2026-11-19, valid until 2031-11-18 (the older one had expired) |
 
 Download the IdP metadata (XML) on the app's page. It goes into
-`op://GitHub/FleetSecrets/SSO_METADATA` for fleet-gitops `sso_settings.metadata`.
+`op://GitHub/FleetSecrets/SSO_METADATA` for fleet-gitops `sso_settings.metadata`,
+**on one line**: fleetctl inserts environment values into the YAML text
+unescaped, so a multi-line value breaks `default.yml`. When the certificate is
+rotated (add a new one, select it for the app), download the metadata again,
+since it embeds the certificate.
 
 ### Fleet directory sync: domain-wide delegation
 
@@ -56,18 +64,15 @@ Manage domain-wide delegation > Add new. A super admin must do this.
 | Client ID | `110911369357226466616` (`fleet-directory-sync@kitzy-homelab.iam.gserviceaccount.com`; also the `fleet_directory_sync_client_id` Terraform output) |
 | OAuth scopes | `https://www.googleapis.com/auth/admin.directory.user.readonly,https://www.googleapis.com/auth/admin.directory.group.readonly,https://www.googleapis.com/auth/admin.directory.group.member.readonly` |
 
-### Fleet: Google Workspace integration
+### Fleet side (in kitzy/fleet-gitops `default.yml`)
 
-Fleet's GitOps YAML has no setting for this, so it is set once in Fleet:
-Settings > Integrations > Identity provider (IdP) > Google Workspace.
-
-| Field | Value |
+| Setting | Value |
 | --- | --- |
-| Service account JSON | `op://GitHub/Fleet Google Workspace/service_account_json` |
-| Primary domain | `kitzy.com` |
-| Admin email to impersonate | a super admin, e.g. `admin-kitzy@kitzy.com` |
+| `sso_settings` | `entity_id: fleet`, `idp_name: Google`, `metadata: '${SSO_METADATA}'` |
+| `integrations.google_workspace` | `api_key_json` from `op://GitHub/Fleet Google Workspace/service_account_json`, domain `kitzy.com`, impersonating `admin-kitzy@kitzy.com` |
 
-Fleet ignores SCIM while this is configured.
+Fleet syncs the directory every 5 minutes and ignores SCIM while the Google
+Workspace integration is configured.
 
 ### Users, groups, org units
 
