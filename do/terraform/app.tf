@@ -120,6 +120,12 @@ locals {
     AUTHENTIK_DISABLE_UPDATE_CHECK      = "true"
     AUTHENTIK_DISABLE_STARTUP_ANALYTICS = "true"
     AUTHENTIK_LOG_LEVEL                 = "info"
+    # Uploaded files (icons, logos, backgrounds) in R2: App Platform has no
+    # shared volume for the local backend. Keys are app-level SECRET env.
+    AUTHENTIK_STORAGE__BACKEND         = "s3"
+    AUTHENTIK_STORAGE__S3__ENDPOINT    = "https://${var.cloudflare_account_id}.r2.cloudflarestorage.com"
+    AUTHENTIK_STORAGE__S3__REGION      = "auto"
+    AUTHENTIK_STORAGE__S3__BUCKET_NAME = cloudflare_r2_bucket.authentik_files.name
   }
 
   authentik_server_env = merge(local.authentik_env, {
@@ -154,7 +160,11 @@ locals {
 
   # App-level SECRET env (see ENV VARS above).
   authentik_secrets = merge(
-    { AUTHENTIK_SECRET_KEY = var.authentik_secret_key },
+    {
+      AUTHENTIK_SECRET_KEY              = var.authentik_secret_key
+      AUTHENTIK_STORAGE__S3__ACCESS_KEY = var.authentik_r2_access_key
+      AUTHENTIK_STORAGE__S3__SECRET_KEY = var.authentik_r2_secret_key
+    },
     local.rehearsal ? { AUTHENTIK_BOOTSTRAP_PASSWORD = random_password.authentik_bootstrap.result } : {}
   )
   fleet_secrets = {

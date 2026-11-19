@@ -70,6 +70,8 @@ jobs:
           TF_VAR_r2_backups_secret_access_key: op://GitHub/R2 backups homelab-do/AWS_SECRET_ACCESS_KEY
           TF_VAR_fleet_r2_access_key_id: op://GitHub/Fleet R2 homelab-do/FLEET_S3_SOFTWARE_INSTALLERS_ACCESS_KEY_ID
           TF_VAR_fleet_r2_secret_access_key: op://GitHub/Fleet R2 homelab-do/FLEET_S3_SOFTWARE_INSTALLERS_SECRET_ACCESS_KEY
+          TF_VAR_authentik_r2_access_key: op://GitHub/R2 authentik homelab-do/ACCESS_KEY
+          TF_VAR_authentik_r2_secret_key: op://GitHub/R2 authentik homelab-do/SECRET_KEY
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
