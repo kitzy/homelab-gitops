@@ -12,10 +12,5 @@
 #   cloudflared tunnel list
 #   OR check the Cloudflare Zero Trust dashboard
 
-tunnels:
-  homelab-vps:
-    # Created by hand in Cloudflare Zero Trust. Its token is in 1Password
-    # (Homelab / Cloudflare Tunnel / VPS_TUNNEL_TOKEN). Plain HTTP to the
-    # containers on the VM's `proxy` Docker network, so no ca_pool.
-    tunnel_id: "0b72a860-709f-40ba-816c-7727f12e100f"
-    description: "homelab-vps (Vultr) Docker Compose stacks"
+# None in use: the homelab-vps tunnel went away with the Vultr VM (2026-11-19).
+tunnels: {}
