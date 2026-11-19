@@ -1,0 +1,3 @@
+.terraform/
+# Not committed: CI runs a fresh init.
+.terraform.lock.hcl
