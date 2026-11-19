@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["custom.regex", "dockerfile"],
+  "enabledManagers": ["custom.regex", "dockerfile", "terraform"],
   "dockerfile": {
     "managerFilePatterns": ["/^do/backup/Dockerfile$/"]
   },
@@ -50,6 +50,19 @@
       "description": "Redis stays on 7.x.",
       "matchPackageNames": ["redis"],
       "allowedVersions": "<8"
+    },
+    {
+      "description": "Terraform providers in do/, dns/ and tailscale/. No lock files are committed, so CI already installs the newest release within each `~>` range on every run; `replace` makes Renovate open a PR only for a release outside the range (a new major), which is what needs review.",
+      "matchManagers": ["terraform"],
+      "matchDepTypes": ["provider", "required_provider"],
+      "rangeStrategy": "replace",
+      "labels": ["terraform"]
+    },
+    {
+      "description": "Leave the Terraform CLI floor (required_version) alone: CI installs the current CLI through hashicorp/setup-terraform, so raising the floor adds nothing.",
+      "matchManagers": ["terraform"],
+      "matchDepTypes": ["required_version"],
+      "enabled": false
     }
   ]
 }
