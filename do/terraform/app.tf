@@ -190,8 +190,11 @@ resource "random_password" "authentik_bootstrap" {
 # --- Authentik ----------------------------------------------------------------
 
 resource "digitalocean_app" "authentik" {
-  # ignore_changes on spec[0].env lifted for one apply, to remove the
-  # rehearsal's AUTHENTIK_BOOTSTRAP_PASSWORD; restored in the next PR.
+  # App-level env holds only SECRETs, which App Platform returns encrypted
+  # (see ENV VARS at the top).
+  lifecycle {
+    ignore_changes = [spec[0].env]
+  }
 
   spec {
     name   = "authentik"
