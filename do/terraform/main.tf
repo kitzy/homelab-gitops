@@ -29,3 +29,34 @@ resource "cloudflare_r2_bucket" "backups" {
     prevent_destroy = true
   }
 }
+
+# Authentik's uploaded files: application and source icons, brand logos,
+# flow backgrounds. App Platform has no volumes, so Authentik's S3 backend
+# stores them here and browsers load them through short-lived presigned URLs.
+resource "cloudflare_r2_bucket" "authentik_files" {
+  account_id    = var.cloudflare_account_id
+  name          = "kitzy-authentik-files"
+  location      = "enam"
+  storage_class = "Standard"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# Browsers fetch the presigned URLs cross-origin from auth.kitzy.net
+# (authentik docs: sys-mgmt/ops/storage-s3).
+resource "cloudflare_r2_bucket_cors" "authentik_files" {
+  account_id  = var.cloudflare_account_id
+  bucket_name = cloudflare_r2_bucket.authentik_files.name
+
+  rules = [{
+    allowed = {
+      origins = ["https://auth.kitzy.net"]
+      methods = ["GET"]
+      headers = ["Authorization"]
+    }
+    max_age_seconds = 3000
+  }]
+}
+

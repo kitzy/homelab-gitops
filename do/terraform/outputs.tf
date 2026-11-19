@@ -8,6 +8,7 @@ output "r2_buckets" {
   value = {
     fleet_installers = cloudflare_r2_bucket.fleet_installers.name
     backups          = cloudflare_r2_bucket.backups.name
+    authentik_files  = cloudflare_r2_bucket.authentik_files.name
   }
 }
 
