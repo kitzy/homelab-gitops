@@ -7,10 +7,10 @@
 locals {
   db_region = "nyc3"
 
-  # Trusted sources while the data is loaded from the Vultr VM. Removed after
-  # the cutover. The apps that use each database (app.tf) are its permanent
-  # trusted sources.
-  migration_source_ips = ["45.77.154.196"]
+  # Extra trusted sources by IP, for one-off data loads or restores. The apps
+  # that use each database (app.tf) are its permanent trusted sources. Was the
+  # Vultr VM during the migration; empty since its decommission.
+  migration_source_ips = []
 }
 
 # --- Fleet: MySQL 8.4 -------------------------------------------------------
