@@ -1,4 +1,4 @@
-# Groups. Membership is not managed here.
+# Groups native to Authentik. Membership is not managed here.
 
 resource "authentik_group" "authentik_admins" {
   attributes   = jsonencode({})
@@ -14,36 +14,20 @@ resource "authentik_group" "authentik_admins" {
   }
 }
 
-resource "authentik_group" "synology_nas" {
-  attributes = jsonencode({
-    distinguishedName = "cn=synology-nas,ou=Groups,dc=kitzy,dc=com"
-    ldap_uniq         = "S-1-5-21-359790238-951543651-1098909184-1890864143"
-  })
-  is_superuser = false
-  name         = "Synology NAS"
-  parents      = []
-  roles        = []
-  users        = []
-
-  # Membership is managed in Authentik (and by the Google LDAP sync).
+# Google Workspace groups ("Synology NAS", "test", "Amazon Web Services")
+# come from the Google LDAP source, which creates and updates them on every
+# sync. They are owned there, not here; these were adopted by mistake and are
+# released from Terraform without being deleted.
+removed {
+  from = authentik_group.synology_nas
   lifecycle {
-    ignore_changes = [users]
+    destroy = false
   }
 }
 
-resource "authentik_group" "test" {
-  attributes = jsonencode({
-    distinguishedName = "cn=test,ou=Groups,dc=kitzy,dc=com"
-    ldap_uniq         = "S-1-5-21-359790238-951543651-2988534303-278350229"
-  })
-  is_superuser = false
-  name         = "test"
-  parents      = []
-  roles        = []
-  users        = []
-
-  # Membership is managed in Authentik (and by the Google LDAP sync).
+removed {
+  from = authentik_group.test
   lifecycle {
-    ignore_changes = [users]
+    destroy = false
   }
 }

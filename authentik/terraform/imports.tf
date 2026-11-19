@@ -218,16 +218,6 @@ import {
 }
 
 import {
-  to = authentik_group.synology_nas
-  id = "ee3c5a93-40e0-4d9c-a7bf-928954e0e4d2"
-}
-
-import {
-  to = authentik_group.test
-  id = "ce6d7a6b-73f3-41ff-9646-97a4e7bdd070"
-}
-
-import {
   to = authentik_brand.default
   id = "a252757c-909e-4c30-8bf9-96e1da1e35c9"
 }
