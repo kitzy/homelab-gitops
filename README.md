@@ -12,8 +12,6 @@ This repository is the single source of truth for the homelab. Each top-level di
 | [`google/`](google/) | Google Cloud project `kitzy-homelab` (Fleet's directory-sync service account, keyless CI) via Terraform on HCP, plus the Google Workspace settings that have no API | Active |
 | [`tailscale/`](tailscale/) | Tailnet config (ACLs, DNS, keys) via Terraform on HCP | Active |
 | [`dns/`](dns/) | Public DNS (Route53 + Cloudflare zones) via Terraform on HCP | Active |
-| `proxmox/` | Proxmox VMs as code (Terraform) | Planned |
-| `docker/` | Standalone Docker container configs | Planned |
 
 History, all November 2026 and all still in the git history: the K3s cluster and Flux (`kubernetes/`) gave way to a Vultr VM running Docker Compose with Doco-CD (`compose/`, `vps/`), which gave way on 18 November to DigitalOcean App Platform (`do/`). Authentik (`authentik/`) was retired on 19 November: Fleet's SSO and IdP data come straight from Google Workspace (`google/`).
 
