@@ -62,13 +62,8 @@ records:
       - "keybase-site-verification=t-u9Qz4iU7oOd4DMKH0FHW69b_Xo-oCXh7dTaPxmmb0"
       - "google-site-verification=RCPsMhka0hUhhhjWGMPboyjoMoFiNMMlyntpCQsjlvg"
       - "1password-site-verification=UFL2MKVZ6JABTLXTDKHM7ARGEQ"
-  # DigitalOcean App Platform apps (do/terraform). DNS-only: a proxied
+  # DigitalOcean App Platform app (do/terraform). DNS-only: a proxied
   # record breaks App Platform's certificate renewal.
-  - name: "auth"
-    type: CNAME
-    ttl: 300
-    values:
-      - "authentik-8qarp.ondigitalocean.app"
   - name: "fleet"
     type: CNAME
     ttl: 300

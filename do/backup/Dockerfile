@@ -6,7 +6,6 @@
 # do/README.md.
 #
 # Tools:
-#   pg_dump 17   from the postgres base image (must be >= the server's major)
 #   mysqldump    Oracle's 8.4 LTS client from repo.mysql.com. MariaDB's
 #                client can fail against MySQL 8 auth.
 #   restic       static binary from the official image

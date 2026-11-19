@@ -31,17 +31,6 @@
       "labels": ["fleet"]
     },
     {
-      "description": "Authentik refuses to start if a release line (2026.2, 2026.5, 2026.8, ...) is skipped. Within a year, one PR per release line; merge them oldest first, one at a time. Year changes (Renovate major) cannot be split per line, and would offer the new year's newest line, so they wait for approval on the Dependency Dashboard: step through each line of the new year by hand.",
-      "matchPackageNames": ["ghcr.io/goauthentik/server"],
-      "separateMultipleMajor": true,
-      "separateMultipleMinor": true,
-      "major": {
-        "dependencyDashboardApproval": true
-      },
-      "labels": ["authentik"],
-      "prBodyNotes": ["**Authentik upgrades must go one release line at a time.** If another Authentik PR for an older release line is open, merge that one first and wait until Authentik is healthy. Skipping a line makes Authentik crash-loop with `Major version skips are not allowed` (see do/README.md, Updates)."]
-    },
-    {
       "description": "The backup worker's pg_dump must be at least the server's major version, and the managed cluster runs PostgreSQL 17. Raise both together.",
       "matchPackageNames": ["postgres"],
       "allowedVersions": "<18"

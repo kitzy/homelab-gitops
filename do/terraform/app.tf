@@ -1,6 +1,8 @@
-# Three App Platform apps: authentik, fleet (with Redis and the migration
-# job) and backups. Separate apps deploy, fail and roll back independently,
-# and each database firewall admits only the apps that use that database.
+# Two App Platform apps: fleet (with Redis and the migration job) and
+# backups. Separate apps deploy, fail and roll back independently, and the
+# database firewall admits only the apps that use the database. (Authentik
+# was a third app until 2026-11-19; Fleet's SSO and IdP data now come from
+# Google Workspace, see google/README.md.)
 #
 # FIRST CREATION of an app: Terraform only learns an app's ID after its first
 # deploy finishes, but that deploy needs the database firewall to admit the
@@ -10,26 +12,23 @@
 #
 # REHEARSAL MODE (local.rehearsal = true; used before the cutover on
 # 2026-11-18, kept for rebuilding a rehearsal environment):
-#   - The databases are empty. Fleet and Authentik create fresh schemas. A
-#     second Fleet or Authentik on a copy of production would run production's
-#     background jobs (webhooks, Apple MDM/ABM sync, SCIM/LDAP sync).
+#   - The database is empty and Fleet creates a fresh schema. A second Fleet
+#     on a copy of production would run production's background jobs
+#     (webhooks, Apple MDM/ABM sync).
 #   - Fleet has no R2 bucket set: its cleanup job deletes installer objects
 #     its database doesn't reference, and the rehearsal database references
-#     none. (The R2 keys are in place, unused.)
-#   - Authentik starts with a random bootstrap password, so its initial-setup
-#     flow is closed. Fleet's setup is completed right after the first deploy
-#     through the fleet app's default URL.
-#   - Domains are auth-do.kitzy.net and fleet-do.kitzy.net.
-#   - Healthchecks.io pings are off (HC_ENABLED), so the rehearsal can't
-#     signal the VM's checks.
+#     none. (The R2 keys are in place, unused.) Complete Fleet's setup right
+#     after the first deploy through the app's default URL.
+#   - The domain is fleet-do.kitzy.net.
+#   - Healthchecks.io pings are off (HC_ENABLED).
 #   - The backup worker runs its nightly job once on every deploy.
 #
 # ENV VARS. App Platform stores SECRET values encrypted and returns only the
 # ciphertext, so the provider always sees them as changed and every apply
 # would redeploy every app. Therefore:
-#   - Component env is all type GENERAL and fully managed. Database passwords
-#     are GENERAL too: the value is a `${db.PASSWORD}` reference that App
-#     Platform resolves at runtime, not the password itself.
+#   - Component env is all type GENERAL and fully managed. The database
+#     password is a `${db.PASSWORD}` reference that App Platform resolves at
+#     runtime, not the password itself.
 #   - Real secrets are app-level SECRET env with ignore_changes. Terraform
 #     sets them when an app is created (or when the ignore is lifted) and
 #     never diffs them afterwards. To rotate one: update 1Password, then in
@@ -37,10 +36,9 @@
 #     put it back in a follow-up PR.
 #
 # App Platform notes:
-#   - run_command replaces the image's ENTRYPOINT, so Authentik's commands
-#     spell out `dumb-init -- ak ...`.
-#   - The database CA certificates arrive as env vars; the run commands write
-#     them to /tmp so Fleet and Authentik can verify the server.
+#   - run_command replaces the image's ENTRYPOINT.
+#   - The database CA certificate arrives as an env var; the run command
+#     writes it to /tmp so Fleet can verify the server.
 #   - `$${...}` is Terraform's escape for App Platform's `${...}` bindable
 #     variables.
 
@@ -49,11 +47,9 @@ locals {
   rehearsal = false
 
   domains = local.rehearsal ? {
-    authentik = "auth-do.kitzy.net"
-    fleet     = "fleet-do.kitzy.net"
+    fleet = "fleet-do.kitzy.net"
     } : {
-    authentik = "auth.kitzy.net"
-    fleet     = "fleet.kitzy.net"
+    fleet = "fleet.kitzy.net"
   }
 
   # Image tags: Renovate reads the `# renovate:` comments (renovate.json).
@@ -63,17 +59,9 @@ locals {
     # renovate: datasource=docker depName=fleetdm/fleet
     tag = "v4.95.0"
   }
-  authentik_image = {
-    registry   = "goauthentik"
-    repository = "server"
-    # renovate: datasource=docker depName=ghcr.io/goauthentik/server
-    tag = "2026.8.5"
-  }
-
   # Writes the CA to a file and execs the command. Runs under /bin/sh.
   # format() fills the last %s; %%s is printf's literal %s.
-  fleet_cmd     = "sh -c 'printf \"%%s\\n\" \"$FLEET_MYSQL_CA_PEM\" > /tmp/mysql-ca.pem && exec fleet %s'"
-  authentik_cmd = "sh -c 'printf \"%%s\\n\" \"$AUTHENTIK_PG_CA_PEM\" > /tmp/pg-ca.pem && exec dumb-init -- ak %s'"
+  fleet_cmd = "sh -c 'printf \"%%s\\n\" \"$FLEET_MYSQL_CA_PEM\" > /tmp/mysql-ca.pem && exec fleet %s'"
 
   fleet_mysql_env = {
     FLEET_MYSQL_ADDRESS  = "$${fleet-mysql.HOSTNAME}:$${fleet-mysql.PORT}"
@@ -105,68 +93,22 @@ locals {
     FLEET_S3_SOFTWARE_INSTALLERS_REGION       = "auto"
   })
 
-  authentik_env = {
-    AUTHENTIK_POSTGRESQL__HOST          = "$${authentik-pg.HOSTNAME}"
-    AUTHENTIK_POSTGRESQL__PORT          = "$${authentik-pg.PORT}"
-    AUTHENTIK_POSTGRESQL__NAME          = "$${authentik-pg.DATABASE}"
-    AUTHENTIK_POSTGRESQL__USER          = "$${authentik-pg.USERNAME}"
-    AUTHENTIK_POSTGRESQL__PASSWORD      = "$${authentik-pg.PASSWORD}"
-    AUTHENTIK_POSTGRESQL__SSLMODE       = "verify-full"
-    AUTHENTIK_POSTGRESQL__SSLROOTCERT   = "/tmp/pg-ca.pem"
-    AUTHENTIK_PG_CA_PEM                 = "$${authentik-pg.CA_CERT}"
-    AUTHENTIK_HOST                      = local.domains.authentik
-    AUTHENTIK_COOKIE_DOMAIN             = "kitzy.net"
-    AUTHENTIK_ERROR_REPORTING__ENABLED  = "false"
-    AUTHENTIK_DISABLE_UPDATE_CHECK      = "true"
-    AUTHENTIK_DISABLE_STARTUP_ANALYTICS = "true"
-    AUTHENTIK_LOG_LEVEL                 = "info"
-    # Uploaded files (icons, logos, backgrounds) in R2: App Platform has no
-    # shared volume for the local backend. Keys are app-level SECRET env.
-    AUTHENTIK_STORAGE__BACKEND         = "s3"
-    AUTHENTIK_STORAGE__S3__ENDPOINT    = "https://${var.cloudflare_account_id}.r2.cloudflarestorage.com"
-    AUTHENTIK_STORAGE__S3__REGION      = "auto"
-    AUTHENTIK_STORAGE__S3__BUCKET_NAME = cloudflare_r2_bucket.authentik_files.name
-  }
-
-  authentik_server_env = merge(local.authentik_env, {
-    AUTHENTIK_LISTEN__HTTP = "0.0.0.0:9000"
-    AUTHENTIK_WEB__WORKERS = "1" # 2 ran the 1 GB instance at 98% RAM (2026-11-18)
-    # App Platform's edge proxies reach the container from private
-    # addresses. Verified 2026-11-18: Authentik logs the real client IP.
-    AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS = "10.0.0.0/8,172.16.0.0/12,100.64.0.0/10"
-    AUTHENTIK_AVATARS                     = "gravatar,initials"
-  })
-
   backup_env = {
-    FLEET_DB_HOST         = "$${fleet-mysql.HOSTNAME}"
-    FLEET_DB_PORT         = "$${fleet-mysql.PORT}"
-    FLEET_DB_USER         = "$${fleet-mysql.USERNAME}"
-    FLEET_DB_PASSWORD     = "$${fleet-mysql.PASSWORD}"
-    FLEET_DB_NAME         = "$${fleet-mysql.DATABASE}"
-    FLEET_DB_CA           = "$${fleet-mysql.CA_CERT}"
-    AUTHENTIK_DB_HOST     = "$${authentik-pg.HOSTNAME}"
-    AUTHENTIK_DB_PORT     = "$${authentik-pg.PORT}"
-    AUTHENTIK_DB_USER     = "$${authentik-pg.USERNAME}"
-    AUTHENTIK_DB_PASSWORD = "$${authentik-pg.PASSWORD}"
-    AUTHENTIK_DB_NAME     = "$${authentik-pg.DATABASE}"
-    AUTHENTIK_DB_CA       = "$${authentik-pg.CA_CERT}"
-    RESTIC_REPOSITORY     = "s3:https://${var.cloudflare_account_id}.r2.cloudflarestorage.com/${cloudflare_r2_bucket.backups.name}"
-    AWS_DEFAULT_REGION    = "auto"
-    RESTIC_HOST           = "homelab-do"
-    HC_ENABLED            = local.rehearsal ? "false" : "true"
+    FLEET_DB_HOST      = "$${fleet-mysql.HOSTNAME}"
+    FLEET_DB_PORT      = "$${fleet-mysql.PORT}"
+    FLEET_DB_USER      = "$${fleet-mysql.USERNAME}"
+    FLEET_DB_PASSWORD  = "$${fleet-mysql.PASSWORD}"
+    FLEET_DB_NAME      = "$${fleet-mysql.DATABASE}"
+    FLEET_DB_CA        = "$${fleet-mysql.CA_CERT}"
+    RESTIC_REPOSITORY  = "s3:https://${var.cloudflare_account_id}.r2.cloudflarestorage.com/${cloudflare_r2_bucket.backups.name}"
+    AWS_DEFAULT_REGION = "auto"
+    RESTIC_HOST        = "homelab-do"
+    HC_ENABLED         = local.rehearsal ? "false" : "true"
     # Rehearsal: back up once on every deploy (see do/backup/entrypoint.sh).
     BACKUP_RUN_ON_START = local.rehearsal ? "true" : "false"
   }
 
   # App-level SECRET env (see ENV VARS above).
-  authentik_secrets = merge(
-    {
-      AUTHENTIK_SECRET_KEY              = var.authentik_secret_key
-      AUTHENTIK_STORAGE__S3__ACCESS_KEY = var.authentik_r2_access_key
-      AUTHENTIK_STORAGE__S3__SECRET_KEY = var.authentik_r2_secret_key
-    },
-    local.rehearsal ? { AUTHENTIK_BOOTSTRAP_PASSWORD = random_password.authentik_bootstrap.result } : {}
-  )
   fleet_secrets = {
     FLEET_SERVER_PRIVATE_KEY                       = var.fleet_server_private_key
     FLEET_LICENSE_KEY                              = var.fleet_license_key
@@ -179,130 +121,6 @@ locals {
     AWS_SECRET_ACCESS_KEY = var.r2_backups_secret_access_key
     HC_BACKUP_URL         = var.hc_backup_url
     HC_CHECK_URL          = var.hc_check_url
-  }
-}
-
-resource "random_password" "authentik_bootstrap" {
-  length  = 32
-  special = false
-}
-
-# --- Authentik ----------------------------------------------------------------
-
-resource "digitalocean_app" "authentik" {
-  # App-level env holds only SECRETs, which App Platform returns encrypted
-  # (see ENV VARS at the top).
-  lifecycle {
-    ignore_changes = [spec[0].env]
-  }
-
-  spec {
-    name   = "authentik"
-    region = "nyc"
-
-    alert {
-      rule = "DEPLOYMENT_FAILED"
-    }
-    alert {
-      rule = "DOMAIN_FAILED"
-    }
-
-    domain {
-      name = local.domains.authentik
-      type = "PRIMARY"
-    }
-
-    database {
-      name         = "authentik-pg"
-      engine       = "PG"
-      production   = true
-      cluster_name = digitalocean_database_cluster.authentik_pg.name
-      db_name      = digitalocean_database_db.authentik.name
-      db_user      = digitalocean_database_user.authentik.name
-    }
-
-    dynamic "env" {
-      for_each = local.authentik_secrets
-      content {
-        key   = env.key
-        value = env.value
-        scope = "RUN_TIME"
-        type  = "SECRET"
-      }
-    }
-
-    ingress {
-      rule {
-        match {
-          path {
-            prefix = "/"
-          }
-        }
-        component {
-          name = "authentik-server"
-        }
-      }
-    }
-
-    service {
-      name               = "authentik-server"
-      instance_size_slug = "apps-s-1vcpu-1gb-fixed"
-      instance_count     = 1
-      http_port          = 9000
-      run_command        = format(local.authentik_cmd, "server")
-
-      image {
-        registry_type = "GHCR"
-        registry      = local.authentik_image.registry
-        repository    = local.authentik_image.repository
-        tag           = local.authentik_image.tag
-      }
-
-      health_check {
-        http_path             = "/-/health/live/"
-        port                  = 9000
-        initial_delay_seconds = 120
-        period_seconds        = 15
-        timeout_seconds       = 10
-        # 10+ minutes: the first boot runs every migration, and the firewall
-        # rule for a new app is added during its first deploy (see top).
-        failure_threshold = 40
-      }
-
-      dynamic "env" {
-        for_each = local.authentik_server_env
-        content {
-          key   = env.key
-          value = env.value
-          scope = "RUN_TIME"
-          type  = "GENERAL"
-        }
-      }
-    }
-
-    worker {
-      name               = "authentik-worker"
-      instance_size_slug = "apps-s-1vcpu-0.5gb"
-      instance_count     = 1
-      run_command        = format(local.authentik_cmd, "worker")
-
-      image {
-        registry_type = "GHCR"
-        registry      = local.authentik_image.registry
-        repository    = local.authentik_image.repository
-        tag           = local.authentik_image.tag
-      }
-
-      dynamic "env" {
-        for_each = local.authentik_env
-        content {
-          key   = env.key
-          value = env.value
-          scope = "RUN_TIME"
-          type  = "GENERAL"
-        }
-      }
-    }
   }
 }
 
@@ -466,14 +284,6 @@ resource "digitalocean_app" "backups" {
       cluster_name = digitalocean_database_cluster.fleet_mysql.name
       db_name      = digitalocean_database_db.fleet.name
       db_user      = digitalocean_database_user.fleet.name
-    }
-    database {
-      name         = "authentik-pg"
-      engine       = "PG"
-      production   = true
-      cluster_name = digitalocean_database_cluster.authentik_pg.name
-      db_name      = digitalocean_database_db.authentik.name
-      db_user      = digitalocean_database_user.authentik.name
     }
 
     dynamic "env" {
