@@ -57,7 +57,7 @@ locals {
     registry   = "fleetdm"
     repository = "fleet"
     # renovate: datasource=docker depName=fleetdm/fleet
-    tag = "v4.95.0"
+    tag = "rc-patch-fleet-v4.96.0"
   }
   # Writes the CA to a file and execs the command. Runs under /bin/sh.
   # format() fills the last %s; %%s is printf's literal %s.
